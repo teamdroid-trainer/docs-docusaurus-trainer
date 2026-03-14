@@ -1,0 +1,47 @@
+openapi: 3.0.3
+info:
+  title: Security Microservice API
+  description: "API de seguridad, gestión de usuarios, login y MFA."
+  version: 1.0.0
+servers:
+  - url: http://localhost:8081
+    description: Servidor de Desarrollo Local
+paths:
+  /api/v1/auth/login:
+    post:
+      tags:
+        - Autenticación
+      summary: "Iniciar sesión de usuario"
+      description: "Valida credenciales y retorna un access_token o un mfa_token si corresponde."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                  example: "xgarnica"
+                password:
+                  type: string
+                  example: "password123"
+      responses:
+        '200':
+          description: "Login exitoso o requiere MFA"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  username:
+                    type: string
+                  mfaRequired:
+                    type: boolean
+                  accessToken:
+                    type: string
+        '401':
+          description: "Credenciales inválidas"

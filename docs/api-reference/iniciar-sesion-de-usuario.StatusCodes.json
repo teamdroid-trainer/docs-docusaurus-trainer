@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"Login exitoso o requiere MFA","content":{"application/json":{"schema":{"type":"object","properties":{"username":{"type":"string"},"mfaRequired":{"type":"boolean"},"accessToken":{"type":"string"}}}}}},"401":{"description":"Credenciales inválidas"}}}
