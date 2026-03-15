@@ -118,10 +118,9 @@ const config: Config = {
       },
       items: [
         {
-          type: 'docSidebar',
-          sidebarId: 'backendQuarkusSidebar',
-          position: 'left',
+          to: '/docs/backend-java-quarkus/intro',
           label: 'Tutorial Backend',
+          position: 'left',
         },
         //{ to: '/blog', label: 'Blog', position: 'left' },
         /*{
@@ -130,51 +129,6 @@ const config: Config = {
           position: 'right',
         },*/
       ],
-    },
-    footer: {
-      style: 'dark',
-      links: [
-        {
-          title: 'Docs',
-          items: [
-            {
-              label: 'Tutorial',
-              to: '/docs/intro',
-            },
-          ],
-        },
-        {
-          title: 'Community',
-          items: [
-            {
-              label: 'Stack Overflow',
-              href: 'https://stackoverflow.com/questions/tagged/docusaurus',
-            },
-            {
-              label: 'Discord',
-              href: 'https://discordapp.com/invite/docusaurus',
-            },
-            {
-              label: 'X',
-              href: 'https://x.com/docusaurus',
-            },
-          ],
-        },
-        {
-          title: 'More',
-          items: [
-            {
-              label: 'Blog',
-              to: '/blog',
-            },
-            {
-              label: 'GitHub',
-              href: 'https://github.com/facebook/docusaurus',
-            },
-          ],
-        },
-      ],
-      copyright: `Copyright © ${new Date().getFullYear()} Trainer, Inc. Built with Docusaurus.`,
     },
     prism: {
       theme: prismThemes.github,

@@ -11,7 +11,7 @@ type FeatureItem = {
 
 function Feature({ title, Svg, description }: FeatureItem) {
   return (
-    <div className={clsx('col col--4 padding-horiz--sm margin-bottom--sm')}>
+    <div className={clsx('col col--4 padding-horiz--sm margin-bottom--md')}>
       <div className={clsx('glass-card padding--md h-100')} style={{ textAlign: 'left' }}>
         <div className="margin-bottom--sm" style={{ color: 'var(--ifm-color-primary)' }}>
           <Svg role="img" />
