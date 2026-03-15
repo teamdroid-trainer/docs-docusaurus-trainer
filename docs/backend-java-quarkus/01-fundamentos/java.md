@@ -1,60 +1,161 @@
 ---
 id: java
-title: "Java"
-description: "Características, poderes y la evolución de las versiones más relevantes: 8, 11, 17, 21 y 25."
+title: "Java: Poderes, Uso y Evolución"
 sidebar_position: 1
+description: "Descubre por qué Java sigue dominando el backend: estabilidad, rendimiento y la evolución desde Java 8 hasta Java 25."
+keywords:
+  - Java
+  - Backend
+  - JVM
+  - LTS
 ---
 
 # Java: Poderes, Uso y Evolución
 
 Java es uno de los lenguajes de programación más utilizados y probados en el mundo empresarial. Su lema **"Escribe una vez, ejecuta en cualquier lugar"** (WORA) lo convirtió en el rey del backend a nivel mundial.
 
-## Superpoderes de Java
+:::tip La Ley de Java
+El código escrito hace 20 años sigue ejecutándose perfectamente en las máquinas virtuales modernas. Esa es la verdadera definición de **Estabilidad**.
+:::
 
-- **Estabilidad y Retrocompatibilidad:** El código escrito hace 20 años sigue ejecutándose en las máquinas virtuales modernas.
-- **Rendimiento cercano al metal (C/C++):** Gracias al compilador JIT (Just-In-Time) y optimizaciones en caliente, Java es extremadamente rápido para cargas de trabajo prolongadas (servidores).
-- **Ecosistema Inmenso:** Posee la colección de librerías de código abierto más grande del mundo (Maven Central) para resolver prácticamente cualquier problema.
-- **Gestión automática de memoria (Garbage Collector):** Evita la mayoría de los errores de fugas de memoria típicos de lenguajes de bajo nivel.
-- **Multihilo de clase mundial:** Con el nuevo "Project Loom" (Virtual Threads), Java puede manejar millones de hilos de ejecución de manera concurrente con un costo mínimo de memoria.
+## 🚀 ¿Por qué elegir Java hoy?
 
-## ¿Dónde se usa más?
+El ecosistema de Java no solo ha sobrevivido, sino que ha evolucionado para dominar los entornos modernos de nube y microservicios.
 
-Java domina en:
-1. **Sistemas Financieros (Fintech y Bancos):** Por su seguridad, rigidez tipada y estabilidad.
-2. **Backend Empresarial:** Microservicios, APIs robustas y arquitecturas distribuidas de alta carga.
-3. **Big Data:** Herramientas como Hadoop, Apache Spark y Kafka están escritas en Java o basados en la JVM (Scala).
-4. **Android:** Fue el lenguaje nativo original para Android (y sigue siendo ampliamente soportado junto a Kotlin).
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+<Tabs>
+<TabItem value="performance" label="Rendimiento Cercano al Metal">
+
+Gracias al compilador **JIT (Just-In-Time)** y optimizaciones en caliente, Java es extremadamente rápido para cargas de trabajo prolongadas, alcanzando velocidades comparables a entornos nativos como C/C++.
+
+</TabItem>
+<TabItem value="ecosystem" label="Ecosistema Inmenso">
+
+Posee la colección de librerías de código abierto más grande del mundo (**Maven Central**), lo que permite resolver prácticamente cualquier problema sin tener que reinventar la rueda.
+
+</TabItem>
+<TabItem value="concurrency" label="Multihilo Revolucionario">
+
+Con la introducción de los **Virtual Threads** (Project Loom), Java puede manejar *millones* de hilos concurrentes con un costo de memoria casi nulo.
+
+</TabItem>
+</Tabs>
 
 ---
 
-## Evolución y Diferencias entre Versiones
+## 🏗️ Casos de Uso Principales
 
-Desde Java 9, la cadencia de lanzamiento cambió a una nueva versión cada 6 meses, con versiones **LTS (Long-Term Support)** enfocadas en empresas.
+El dominio de Java es absoluto en sistemas que requieren alta disponibilidad y escalabilidad masiva.
 
-### Java 8 (2014) - La Gran Revolución
-- **El salto a lo funcional:** Introdujo **Lambdas** (`() -> {}`) y la API **Streams** para procesamiento de datos declarativo.
-- **Optional:** Para lidiar con el infame `NullPointerException`.
-- *Uso:* Aún hoy, muchos sistemas "legacy" siguen corriendo en Java 8.
+```mermaid
+graph TD
+  A[Ecosistema Java] --> B(Sistemas Financieros)
+  A --> C(Backend Empresarial)
+  A --> D(Big Data)
+  A --> E(Android)
 
-### Java 11 (2018) - La primera LTS moderna
-- **var:** Inferencia de tipos en variables locales (`var name = "Juan";`).
-- **HTTP Client moderno:** API reactiva y estándar para hacer llamadas HTTP/2.
-- **Nuevos métodos para Strings** como `isBlank()`, `lines()`.
+  B -.->|Seguridad y Tipado| B1[Bancos & Fintech]
+  C -.->|Alta Carga| C1[Microservicios & APIs]
+  D -.->|Tratamiento Masivo| D1[Hadoop, Spark, Kafka]
+  E -.->|Soporte Nativo| E1[Dispositivos Móviles]
+```
 
-### Java 17 (2021) - El estándar actual del mercado
-- **Records:** Clases inmutables para transportar datos (Data Transfer Objects) eliminando el *boilerplate* (como Lombok parcialmente).
-- **Text Blocks:** Strings multilínea usando `"""` (adiós a concatenar con `+`).
-- **Pattern Matching (básico):** Simplificación del operador `instanceof`.
-- **Sealed Classes:** Clases que restringen quién puede heredar de ellas.
+---
 
-### Java 21 (2023) - La Nueva Revolución LTS
-- **Virtual Threads (Project Loom):** Hilos extremadamente ligeros. Permite tener *millones* de hilos en vez de miles, revolucionando servidores web (Quarkus y Tomcat escalan de manera absurda sin programación reactiva compleja).
-- **Pattern Matching para Switch:** Los switches ahora pueden evaluar tipos de objetos, no solo valores primitivos, y desestructurar *Records*.
-- **Sequenced Collections:** Interfaces claras para colecciones con un orden definido (`getFirst()`, `getLast()`).
+## ⏳ La Evolución Lógica (Versiones LTS)
 
-### Java 25 (EA - Acceso Temprano / LTS Futura)
-- **Mejoras en Pattern Matching:** Aún más expresivo.
-- **Valhalla (Avance):** Tipos de valor para acercar el rendimiento de memoria al de lenguajes como C++ (evitando punteros innecesarios a objetos pequeños).
-- **Foreign Function & Memory API (Panama):** Reemplazo de JNI para conectar Java con código C/C++ de manera nativa, segura y mil veces más rápida.
+Desde Java 9, la cadencia de lanzamiento entrega una nueva versión cada 6 meses, consolidando el valor empresarial en las versiones **LTS (Long-Term Support)**.
 
-> **En este curso:** Al trabajar con Quarkus moderno, las empresas apuntan directamente a **Java 21**, aprovechando los *Virtual Threads* para el máximo rendimiento.
+### La Línea de Tiempo de LTS
+
+<Tabs>
+<TabItem value="java8" label="Java 8 (2014)">
+
+**La Gran Revolución Funcional**
+- Introdujo **Lambdas** (`() -> {}`) y la API **Streams**.
+- Añadió `Optional` para mitigar el infame `NullPointerException`.
+- *Uso:* Aún hoy, es la base de muchos sistemas legacy.
+
+```java title="Procesamiento Funcional con Streams y Lambdas"
+List<String> names = Arrays.asList("Ana", "Juan", "Pedro");
+names.stream()
+    .filter(name -> name.startsWith("A"))
+    .forEach(System.out::println);
+```
+
+</TabItem>
+<TabItem value="java11" label="Java 11 (2018)">
+
+**La Primera LTS Moderna**
+- Inferencia de tipos con `var`.
+- **HTTP Client moderno** (Reactivo, soportando HTTP/2).
+- Herramientas mejoradas para manipular Strings (`isBlank()`, `lines()`).
+
+```java title="Inferencia de Tipos y Nuevo HTTP Client"
+var request = HttpRequest.newBuilder()
+    .uri(URI.create("https://api.example.com"))
+    .build();
+
+var client = HttpClient.newHttpClient();
+var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+System.out.println(response.body());
+```
+
+</TabItem>
+<TabItem value="java17" label="Java 17 (2021)">
+
+**El Estándar Actual del Mercado**
+- **Text Blocks:** Strings multilínea usando `"""`.
+- **Pattern Matching básico** y Clases Selladas (`Sealed Classes`).
+- **Records:** Clases inmutables para transportar datos, eliminando boilerplate.
+
+```java title="DTOs Inmutables con Records"
+// Adiós a docenas de líneas de getters, setters, equals y hashCode
+public record UserDto(String name, String email) {}
+```
+
+</TabItem>
+<TabItem value="java21" label="Java 21 (2023)">
+
+**La Nueva Revolución Concurrente**
+- **Pattern Matching avanzado** para constructores `switch`.
+- **Sequenced Collections:** Interfaces claras para operaciones con orden (`getFirst()`, `getLast()`).
+- **Virtual Threads (Loom):** Hilos extremadamente ligeros. Permite escalar servidores web de manera absurda sin programación reactiva compleja.
+
+```java title="Escalabilidad Masiva con Virtual Threads"
+try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+    IntStream.range(0, 1_000_000).forEach(i -> {
+        // Ejecución de 1 millón de hilos concurrentes sin colapsar la memoria
+        executor.submit(() -> System.out.println("Hilo ligero " + i));
+    });
+}
+```
+
+</TabItem>
+<TabItem value="java25" label="Java 25 (LTS Futura)">
+
+**La Próxima Frontera**
+- **Valhalla (Avance):** Tipos de valor para acercar el rendimiento de memoria al de C++ (sin punteros a objetos pequeños).
+- **Panama:** Nueva Foreign Function & Memory API (Reemplaza JNI, mil veces más rápida).
+
+```java title="Tipos de Valor Cercanos al Metal (Proyección Valhalla)"
+// Concepto futuro: objetos compactos sin sobrecarga de identidad en memoria
+public value record Point(int x, int y) {}
+
+Point p1 = new Point(10, 20);
+```
+
+</TabItem>
+</Tabs>
+
+---
+
+## 🎯 Conclusión Arquitectónica
+
+> "Una arquitectura moderna construida sobre **Java 21 o Java 25** combina la pureza del código imperativo tradicional con la escalabilidad extrema de sistemas puramente asíncronos."
+
+:::info ⚡ En este curso
+Al trabajar con características modernas (como **Quarkus**), las empresas apuntan directamente a **Java 21 o Java 25**, aprovechando los *Virtual Threads* para lograr un rendimiento insuperable en la nube.
+:::

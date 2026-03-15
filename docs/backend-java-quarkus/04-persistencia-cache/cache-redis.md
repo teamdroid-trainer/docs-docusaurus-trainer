@@ -1,50 +1,37 @@
 ---
 id: cache-redis
-title: "Caché con Redis"
-description: "Integración de Redis como caché en el microservicio de seguridad: Hexagonal Architecture, Ports & Adapters y TTL seguro con hash SHA-256"
+title: "Caché de Autenticación con Redis"
+description: "Integración de Redis en el microservicio de seguridad: TTL seguro con hash SHA-256 y arquitectura hexagonal de puertos y adaptadores."
 sidebar_position: 2
 ---
 
-# Sesión 4 — Redis como Caché en Security
+# Caché de Autenticación con Redis
 
-## 1. Objetivo de la Sesión
-El objetivo de esta sesión es integrar **Redis como sistema de caché** en el microservicio `cja-msa-sc-security`. Aprenderemos cómo almacenar y recuperar información de manera eficiente para optimizar consultas recurrentes como la validación de autenticación, respetando los principios de **Clean Architecture** y **Hexagonal Architecture**.
+Integrar **Redis** en el microservicio `cja-msa-sc-security` es la diferencia entre hacer esperar 300ms a cada usuario en cada login, o responderle en menos de 1ms la mayor parte de las veces. A diferencia del microservicio de auditoría (que gestiona el almacenamiento de eventos), este módulo de caché vive dentro de **Security** y optimiza específicamente el flujo de autenticación contra Keycloak.
 
-## 2. Alcance Implementado
-- Integración del cliente Redis para Quarkus.
-- Implementación de un caso de uso didáctico: caché de la respuesta de autenticación en el flujo de `login`.
-- Creación de un puerto de salida (`AuthCachePort`) y su adaptador (`RedisAuthCacheAdapter`).
-- Adición de la configuración de Redis en `application.properties`.
+Implementamos un patrón de caché seguro donde la clave incluye un hash SHA-256 de la contraseña, garantizando que solo la combinación exacta de credenciales puede recuperar un token cacheado.
 
-## 3. Dependencias
-- **Quarkus Redis Client:** `io.quarkus:quarkus-redis-client`
-- **Quarkus Jackson:** Para la serialización/deserialización automática.
+---
 
-## 4. ¿Qué es Redis y por qué se usa como Caché?
-**Redis** (Remote Dictionary Server) es un almacén de estructura de datos en memoria. Se utiliza como caché porque:
-- **Ultra rápido:** Al residir en memoria RAM, los tiempos de lectura y escritura son sub-milisegundos.
-- **Estructuras ricas:** Soporta strings, hashes, listas, sets, etc.
-- **Expiración (TTL):** Permite configurar tiempos de vida por clave, ideal para purgar datos obsoletos.
+## 1. Radiografía Visual: El Flujo de Login con Caché
 
-## 5. Caso de Uso: Caché Segura de Autenticación
-
-Al momento en que un usuario se autentica exitosamente contra Keycloak, la respuesta se almacena en Redis con un TTL. **La clave del caché se construye usando el `username` Y un hash (SHA-256) de la contraseña**, evitando que una contraseña incorrecta obtenga un token cacheado.
+El diagrama de estados siguiente muestra la decisión central: si las credenciales tienen un token válido en Redis, el microservicio **no necesita contactar a Keycloak**, ahorrando cientos de milisegundos por petición.
 
 ```mermaid
 stateDiagram-v2
     [*] --> RecibirLogin: POST /login (user, pass)
-    RecibirLogin --> GenerarKey: Hash(pass)
+    RecibirLogin --> GenerarKey: Hash SHA-256 (pass)
     GenerarKey --> ConsultarRedis: Key = user + hash
 
-    ConsultarRedis --> CacheHit: Si existe (Contraseña Correcta)
-    CacheHit --> RetornarToken: Retorno Instantáneo (200 OK)
+    ConsultarRedis --> CacheHit: Existe (Credenciales Correctas)
+    CacheHit --> RetornarToken: Respuesta Instantánea (200 OK)
 
-    ConsultarRedis --> CacheMiss: Si no existe (Nueva / Pass Incorrecta)
+    ConsultarRedis --> CacheMiss: No existe (Nueva / Pass Incorrecta)
     CacheMiss --> ValidarKeycloak: Invocar servicio OIDC
     ValidarKeycloak --> LoginExitoso: Keycloak valida OK
     ValidarKeycloak --> LoginFallido: Keycloak rechaza
 
-    LoginExitoso --> GuardarRedis: Guardar token con TTL
+    LoginExitoso --> GuardarRedis: save(key, token, TTL=300s)
     GuardarRedis --> RetornarToken
 
     LoginFallido --> RetornarError: 401 Unauthorized
@@ -52,135 +39,15 @@ stateDiagram-v2
     RetornarToken --> [*]
 ```
 
-## 6. Configuración de Redis
+:::tip ¿Por qué el hash de la contraseña en la clave?
+Sin el hash, un atacante que conoce el username podría obtener el token de otro usuario con una contraseña incorrecta si aún está en caché. Con el hash SHA-256, la clave `auth:token:usuario:a3f5b8c1d2...` es única por combinación de credenciales. **Una contraseña incorrecta genera una clave diferente → siempre Cache Miss → siempre rechazada por Keycloak.**
+:::
 
-```properties
-# ── Configuración de Caché (Redis) ──
-quarkus.redis.hosts=${REDIS_HOSTS:redis://localhost:6379}
-# Tiempo de expiración de la caché de autenticación en segundos
-auth.cache.ttl.seconds=300
-```
+---
 
-## 7. Código de Integración
+## 2. La Arquitectura: Puerto y Adaptador
 
-**Puerto (AuthCachePort)**:
-```java
-public interface AuthCachePort {
-    Optional<TokenResponseDto> getAuthInfo(String username, String password);
-    void saveAuthInfo(String username, String password, TokenResponseDto tokenResponse);
-}
-```
-
-**Adaptador Redis (RedisAuthCacheAdapter)**:
-```java
-@ApplicationScoped
-public class RedisAuthCacheAdapter implements AuthCachePort {
-
-    @Override
-    public Optional<TokenResponseDto> getAuthInfo(String username, String password) {
-        return Optional.ofNullable(valueCommands.get(buildKey(username, password)));
-    }
-
-    @Override
-    public void saveAuthInfo(String username, String password, TokenResponseDto tokenResponse) {
-        valueCommands.setex(buildKey(username, password),
-            Duration.ofSeconds(ttlSeconds).toSeconds(), tokenResponse);
-    }
-
-    private String buildKey(String username, String password) {
-        return CACHE_PREFIX + username + ":" + hashPassword(password); // Hash SHA-256
-    }
-}
-```
-
-## 8. Estructura Actualizada del Proyecto
-
-```text
-src/main/java/cja/msa/sc/security/...
-├── application/
-│   ├── port/
-│   │   └── out/
-│   │       ├── AuthenticationPort.java
-│   │       └── AuthCachePort.java          (NUEVO)
-│   └── service/
-│       └── AuthService.java                (MODIFICADO)
-└── infrastructure/
-    └── adapters/
-        └── out/
-            ├── keycloak/KeycloakAuthenticationAdapter.java
-            └── redis/
-                └── RedisAuthCacheAdapter.java (NUEVO)
-```
-
-## 9. Configuración de Redis local con Docker
-
-```bash
-# Opción 1: docker run
-docker run -d --name redis-local -p 6379:6379 redis:7-alpine
-
-# Verificar conectividad
-docker exec -it redis-local redis-cli ping
-# Respuesta esperada: PONG
-```
-
-```yaml
-# Opción 2: docker-compose.yml (recomendada)
-services:
-  redis:
-    image: redis:7-alpine
-    container_name: redis-local
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
-
-volumes:
-  redis_data:
-```
-
-### Comandos útiles de Redis CLI
-```bash
-# Ver todas las claves almacenadas
-KEYS auth:token:*
-
-# Ver el TTL restante de una clave
-TTL auth:token:usuario1:a3f5b8c1d2...
-
-# Eliminar todo el contenido de la base de datos (desarrollo)
-FLUSHDB
-
-# Monitorear operaciones en tiempo real
-MONITOR
-```
-
-## 10. Ventajas y Desventajas de Redis — Análisis Numérico
-
-| Escenario | Sin Redis | Con Redis (Cache Hit) | Ahorro |
-|---|---|---|---|
-| **Login exitoso (latencia)** | ~150–300 ms (ida y vuelta a Keycloak) | **< 1 ms** | **99.7% reducción** |
-| **100 logins/seg del mismo usuario** | 100 llamadas a Keycloak | **1 llamada + 99 lecturas caché** | **99% menos carga** |
-| **1,000 usuarios concurrentes** | ~150–300 seg acumulados | **~0.1–1 seg acumulados** | **Escalabilidad masiva** |
-
-### Comparativa de Latencia
-```mermaid
-graph LR
-    subgraph "Latencia promedio por operación"
-        R["Redis: 0.1ms ████"]
-        P["PostgreSQL: 3ms ████████████████████████████████"]
-        K["Keycloak API: 150ms ████████████████████████████████████████████████████████████████"]
-    end
-```
-
-### Desventajas y Consideraciones
-
-| Aspecto | Detalle | Mitigación |
-|---|---|---|
-| **Uso de memoria RAM** | ~1 KB por entrada de token. Para 1,000,000 = ~1 GB. | Configurar `maxmemory` y política `allkeys-lru`. Con TTL de 300s el consumo real es mucho menor. |
-| **Persistencia limitada** | Si Redis se reinicia sin persistencia, se pierden datos cacheados. | Usar `appendonly yes` o `RDB snapshots`. |
-| **Consistencia eventual** | Un token podría seguir en caché tras ser revocado en Keycloak. | El TTL corto (300s) limita la ventana de inconsistencia. |
-
-## 11. Diagramas de Arquitectura
+Redis vive completamente en la capa de **infraestructura**. El dominio interactúa con él a través del puerto de salida `AuthCachePort`, manteniendo el núcleo desacoplado de la tecnología de caché.
 
 ```mermaid
 graph TD
@@ -195,6 +62,148 @@ graph TD
     KC_ADAPT <-->|REST API| KEYCLOAK[(Keycloak)]
 ```
 
-## 12. Próximos Pasos
-- Implementar **Circuit Breaker** con `@Fallback` y MicroProfile Fault Tolerance para protegerse de caídas de Redis (ver Sesión 5).
-- Utilizar **RedisPubSub** para invalidación distribuida de caché.
+---
+
+## 3. Implementación del Patrón Hexagonal
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+<Tabs>
+<TabItem value="port" label="1. Puerto de Salida">
+
+El contrato del dominio es simple y no menciona Redis en ninguna parte:
+
+```java title="AuthCachePort.java"
+public interface AuthCachePort {
+    Optional<TokenResponseDto> getAuthInfo(String username, String password);
+    void saveAuthInfo(String username, String password, TokenResponseDto tokenResponse);
+}
+```
+
+</TabItem>
+<TabItem value="adapter" label="2. Adaptador Redis">
+
+La implementación concreta inyecta el cliente de Redis de Quarkus y construye la clave segura con SHA-256:
+
+```java title="RedisAuthCacheAdapter.java"
+@ApplicationScoped
+public class RedisAuthCacheAdapter implements AuthCachePort {
+
+    @Override
+    public Optional<TokenResponseDto> getAuthInfo(String username, String password) {
+        return Optional.ofNullable(valueCommands.get(buildKey(username, password)));
+    }
+
+    @Override
+    public void saveAuthInfo(String username, String password, TokenResponseDto token) {
+        valueCommands.setex(buildKey(username, password),
+            Duration.ofSeconds(ttlSeconds).toSeconds(), token);
+    }
+
+    private String buildKey(String username, String password) {
+        // Hash SHA-256 de la contraseña → ninguna contraseña incorrecta reutiliza caché
+        return CACHE_PREFIX + username + ":" + hashPassword(password);
+    }
+}
+```
+
+</TabItem>
+<TabItem value="config" label="3. Configuración Redis">
+
+```properties title="application.properties"
+# Conexión a Redis
+quarkus.redis.hosts=${REDIS_HOSTS:redis://localhost:6379}
+
+# TTL de la caché de autenticación (5 minutos)
+auth.cache.ttl.seconds=300
+```
+
+</TabItem>
+<TabItem value="docker" label="4. Redis Local con Docker">
+
+Elige la opción más conveniente para tu entorno de desarrollo:
+
+```bash title="Opción A: Docker Run"
+docker run -d --name redis-local -p 6379:6379 redis:7-alpine
+
+# Verifica conectividad
+docker exec -it redis-local redis-cli ping
+# Respuesta esperada: PONG
+```
+
+```yaml title="Opción B: docker-compose.yml (recomendada)"
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+
+volumes:
+  redis_data:
+```
+
+</TabItem>
+</Tabs>
+
+---
+
+## 4. Impacto en Rendimiento y Consideraciones
+
+<Tabs>
+<TabItem value="perf" label="Métricas de Rendimiento">
+
+| Escenario | Sin Redis | Con Redis (Cache Hit) | Ahorro |
+|:---|:---|:---|:---|
+| **Login exitoso (latencia)** | ~150–300 ms | **< 1 ms** | **99.7% reducción** |
+| **100 logins/seg del mismo usuario** | 100 llamadas a Keycloak | **1 llamada + 99 de caché** | **99% menos carga** |
+| **1,000 usuarios concurrentes** | ~150–300 seg acumulados | **~0.1–1 seg acumulados** | **Escalabilidad masiva** |
+
+</TabItem>
+<TabItem value="tradeoffs" label="Consideraciones (Trade-Offs)">
+
+:::caution Consistencia Eventual y Memoria
+- **Consistencia**: Un token podría permanecer en caché tras ser revocado en Keycloak. El TTL corto (300s) limita la ventana de riesgo a 5 minutos máximo.
+- **Memoria RAM**: ~1 KB por entrada de token. Con TTL activo y la política `allkeys-lru`, la memoria se mantiene controlada dentro del límite configurado.
+- **Persistencia**: Sin configurar `appendonly yes`, un reinicio de Redis borra la caché (inofensivo para el negocio, solo causa más llamadas a Keycloak momentáneamente).
+:::
+
+</TabItem>
+<TabItem value="redis-cli" label="Comandos Redis CLI">
+
+Comandos útiles para inspeccionar y depurar la caché en desarrollo:
+
+```bash
+# Ver todas las claves de autenticación almacenadas
+KEYS auth:token:*
+
+# Ver el TTL restante de una clave específica (en segundos)
+TTL auth:token:usuario1:a3f5b8c1d2...
+
+# Monitorear operaciones en tiempo real
+MONITOR
+
+# Limpiar toda la base de datos (solo en desarrollo)
+FLUSHDB
+```
+
+</TabItem>
+</Tabs>
+
+---
+
+## 5. Estructura del Proyecto
+
+```text
+src/main/java/cja/msa/sc/security/...
+├── application/port/out/
+│   ├── AuthenticationPort.java
+│   └── AuthCachePort.java          <- [NUEVO] Puerto de Salida
+└── infrastructure/adapters/out/
+    ├── keycloak/KeycloakAuthenticationAdapter.java
+    └── redis/
+        └── RedisAuthCacheAdapter.java  <- [NUEVO] Adaptador Redis
+```

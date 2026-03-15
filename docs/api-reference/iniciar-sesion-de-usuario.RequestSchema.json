@@ -1,1 +1,27 @@
-{"title":"Body","body":{"required":true,"content":{"application/json":{"schema":{"type":"object","required":["username","password"],"properties":{"username":{"type":"string","example":"xgarnica"},"password":{"type":"string","example":"password123"}}}}}}}
+{
+    "title": "Body",
+    "body": {
+        "required": true,
+        "content": {
+            "application/json": {
+                "schema": {
+                    "type": "object",
+                    "required": [
+                        "username",
+                        "password"
+                    ],
+                    "properties": {
+                        "username": {
+                            "type": "string",
+                            "example": "user"
+                        },
+                        "password": {
+                            "type": "string",
+                            "example": "password123"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

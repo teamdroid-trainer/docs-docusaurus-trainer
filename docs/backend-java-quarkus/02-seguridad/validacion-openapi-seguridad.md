@@ -1,206 +1,25 @@
 ---
 id: validacion-openapi-seguridad
-title: "Desarrollo del tema"
-description: "Bean Validation, documentación OpenAPI/Swagger y autenticación JWT con Keycloak OIDC"
+title: "Microservicio: Securización y Documentación Viva"
+description: "Implementación de Bean Validation, documentación Swagger interactiva y aseguramiento de endpoints con JWT y Keycloak OIDC."
 sidebar_position: 4
 ---
 
-# Validación, OpenAPI y Seguridad Básica
+# Securización y Documentación Viva
+
+Este documento detalla la implementación de tres pilares fundamentales para elevar nuestra API REST a nivel de producción: aseguramiento de datos de entrada (**Bean Validation**), protección de recursos mediada por tokens (**Keycloak OIDC**) y exposición de contratos legibles (**OpenAPI/Swagger UI**).
 
 ---
 
-## 1. Propósito de la Sesión
+## 1. Radiografía Visual: El Flujo de Seguridad Inyectado
 
-El propósito de esta sesión es agregar tres capacidades fundamentales para cualquier API REST lista para producción:
-1. **Bean Validation (Hibernate Validator):** Para asegurar que los datos de entrada cumplen con reglas de negocio estrictas.
-2. **OpenAPI (pequeño Swagger UI):** Para documentar de manera viva y estructurada nuestros endpoints.
-3. **Keycloak (OIDC JWT):** Para proteger nuestros endpoints asegurando que solo los usuarios con los roles correctos puedan interactuar con la API.
-
-Mantendremos estrictamente la estructura orientada a **Hexagonal Architecture** de la Sesión 1.
-
----
-
-## 2. Nuevas Dependencias
-
-Agregamos las siguientes librerías a nuestro `build.gradle.kts`:
-
-```kotlin
-// Hibernate Validator para anotaciones como @NotBlank, @Email
-implementation("io.quarkus:quarkus-hibernate-validator")
-
-// Generación de documentación de OpenAPI y Swagger UI interactivo
-implementation("io.quarkus:quarkus-smallrye-openapi")
-
-// Autenticación y Autorización basada en OpenID Connect (OIDC) y JWT
-implementation("io.quarkus:quarkus-oidc")
-
-// Facade Keycloak: MicroProfile REST Client con Jackson
-implementation("io.quarkus:quarkus-rest-client-jackson")
-```
-
----
-
-## 3. Implementación: Bean Validation
-
-### 3.1 DTO de Petición (`CreateUserDto`)
-Las validaciones de entrada pertenecen a la capa de Infraestructura / Adaptadores REST. Para evitar inyecciones e inconsistencias, usamos anotaciones `jakarta.validation.constraints`:
-
-```java
-public class CreateUserDto {
-    @NotBlank(message = "El nombre de usuario (username) no puede ser nulo o vacío")
-    @Size(min = 5, max = 20)
-    @Pattern(regexp = "^[a-zA-Z0-9_]+$")
-    private String username;
-
-    @NotBlank
-    @Email
-    private String email;
-    // ...
-}
-```
-
-### 3.2 El Manejador de Excepciones de Validación (`ValidationExceptionMapper`)
-Cuando una validación falla, Hibernate arroja una `ConstraintViolationException`. Capturamos esto usando un `@Provider` en JAX-RS para retornar un formato estructurado `HTTP 400 Bad Request`.
-
-```json
-{
-  "status": 400,
-  "error": "Bad Request",
-  "message": "Fallo de validación en los datos de entrada",
-  "details": [
-    {
-      "field": "createUser.request.email",
-      "message": "Debe ser un formato de email válido"
-    }
-  ]
-}
-```
-
----
-
-## 4. Implementación: OpenAPI y Swagger UI
-
-Agregamos descripciones enriquecidas a nuestra API utilizando las anotaciones estándar de MicroProfile OpenAPI.
-
-### 4.1 En el Recurso (`UserResource`)
-```java
-@Operation(summary = "Obtener usuario por ID", description = "Retorna la tupla pública de un usuario.")
-@APIResponses(value = {
-    @APIResponse(responseCode = "200", description = "Usuario encontrado",
-                 content = @Content(schema = @Schema(implementation = UserResponseDto.class))),
-    @APIResponse(responseCode = "404", description = "No se encontró el usuario")
-})
-public Response getUserById(@PathParam("id") String id) { ... }
-```
-
----
-
-## 5. Implementación: Seguridad con Keycloak (OIDC)
-
-### 5.1 Restricción de Roles (`@RolesAllowed`)
-```java
-@POST
-@RolesAllowed({"ADMIN"}) // Solo usuarios autenticados y con rol "ADMIN"
-public Response createUser(@Valid CreateUserDto request) { ... }
-```
-
-### 5.2 Configuración en `application.properties`
-```properties
-quarkus.oidc.auth-server-url=http://localhost:8180/realms/quarkus
-quarkus.oidc.client-id=backend-service
-quarkus.oidc.credentials.secret=secret
-quarkus.oidc.roles.role-claim-path=realm_access/roles
-
-# Cliente REST Interno hacia Keycloak (Facade auth)
-quarkus.rest-client.keycloak-api.url=http://localhost:8180/realms/quarkus
-```
-
----
-
-## 6. Configuración Rápida de Keycloak local con Docker
-
-```bash
-docker run --name keycloak-local -p 8180:8080 \
-  -e KC_BOOTSTRAP_ADMIN_USERNAME=admin \
-  -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
-  quay.io/keycloak/keycloak:26.5.5 start-dev
-```
-
-**Pasos en el Keycloak UI (`http://localhost:8180`):**
-1. Crear un Realm llamado `quarkus`.
-2. Crear un Cliente llamado `backend-service` (habilitar Client Authentication y Service Accounts).
-3. Configurar client secret a `secret`.
-4. Crear roles en los Realm Roles (`ADMIN`, `OPERATOR`, `CONSULTATION`).
-5. Crear usuarios y asignarles los passwords y roles correspondientes.
-
-Ver guía completa en: [Configuración de Keycloak](./configuracion-keycloak)
-
----
-
-## 7. Árbol de Proyecto Actualizado
-
-```
-src/main/java/cja/msa/sc/security/...
-├── application/
-│   ├── port/...
-│   └── service/
-│       └── UserQueryService.java
-├── domain/
-│   ├── exception/
-│   │   └── UserNotFoundException.java
-│   └── model/...
-└── infrastructure/
-    └── adapters/
-        ├── in/
-        │   └── rest/
-        │       ├── dto/...
-        │       ├── exception/
-        │       │   ├── GlobalExceptionMapper.java
-        │       │   └── ValidationExceptionMapper.java  <- [NUEVO]
-        │       ├── mapper/...
-        │       ├── HealthResource.java
-        │       └── UserResource.java                   <- [MODIFICADO]
-        └── out/...
-```
-
----
-
-## 8. Pasos para Probar esta Sesión
-
-1. Levanta Keycloak e importa o configura los usuarios indicados.
-2. Obtén un Token Bearer para el cliente.
-3. Envía una petición `POST /api/v1/users` con un cuerpo vacío o email inválido.
-4. Confirma que recibes un HTTP 400 (Bean Validation).
-5. Envía un Body válido sin el Token. Obtendrás `401 Unauthorized`.
-6. Envía un Token válido pero de un usuario `OPERATOR`. Obtendrás `403 Forbidden`.
-7. Entra en el navegador a `http://localhost:8080/swagger-ui` para ver la documentación OpenAPI.
-
----
-
-## 9. Facade de Autenticación ROPC
-
-Se agregó un intermediario (Facade) en `cja-msa-sc-security` para no exponer Keycloak directamente al Frontend:
-
-1. **`KeycloakRestClient`**: Interfaz con `@RegisterRestClient` que mapea las llamadas `/token` y `/logout` de Keycloak.
-2. **`AuthResource`**: Expone internamente los endpoints `/api/v1/auth/login` y `/api/v1/auth/logout`.
-3. Todo respeta **Clean Architecture** mediante el caso de uso `AuthUseCase` y el puerto de salida `AuthenticationPort`.
-
-```bash
-# Ejemplo de Login via Facade
-curl -X POST "http://localhost:8080/api/v1/auth/login" \
-     -H "Content-Type: application/json" \
-     -d '{"username": "admin","password": "admin"}'
-```
-
----
-
-## 10. Flujo de Arquitectura y Seguridad (Secuencia)
+Todo comienza con el flujo de autenticación mediado por nuestro patrón Facade. El Frontend se comunica exclusivamente con nuestro microservicio, el cual orquesta la validación de credenciales con Keycloak e intercepta estructuralmente todas las transacciones entrantes con capas de seguridad y validación.
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor Cliente as App / Frontend
-    box lightblue cja-msa-sc-security
+    box #f8f9fa cja-msa-sc-security
         participant Resource as AuthResource<br/>(In Adapter)
         participant UseCase as AuthUseCase<br/>(Application Port)
         participant Adapter as KeycloakAuthAdapter<br/>(Out Adapter)
@@ -217,11 +36,12 @@ sequenceDiagram
     UseCase-->>Resource: TokenResponseDto
     Resource-->>Cliente: HTTP 200 OK (JSON con tokens)
 
-    Note over Cliente, Keycloak: 2. Flujo de Petición Protegida (con Introspección)
+    Note over Cliente, Keycloak: 2. Flujo de Petición Protegida (con Introspección & Validación)
     Cliente->>Resource: POST /api/v1/users<br/>Header: Authorization Bearer [Token]
     Resource->>Keycloak: POST /introspect<br/>(¿El token sigue vivo/valido?)
     Keycloak-->>Resource: true (Activo)
     Resource->>Resource: Valida @RolesAllowed("ADMIN")
+    Resource->>Resource: Valida Reglas Bean Validation (@Valid)
     Resource-->>Cliente: HTTP 201 Created
 
     Note over Cliente, Keycloak: 3. Flujo de Cierre de Sesión (Logout Facade)
@@ -234,3 +54,134 @@ sequenceDiagram
     UseCase-->>Resource: void
     Resource-->>Cliente: HTTP 204 No Content
 ```
+
+:::tip Orquestación Transparente
+Gracias a la **Clean Architecture**, todo el flujo de comunicación hacia Keycloak (pasos 3 al 6 y 18 al 21) está completamente aislado en la capa del `KeycloakAuthAdapter`. Nuestros casos de uso no saben ni les importa la existencia de Keycloak, ellos solo lidian con dominios abstractos.
+:::
+
+---
+
+## 2. Los Tres Pilares de la Implementación
+
+Para dotar a nuestra API de estas capacidades empresariales, agregamos al `build.gradle.kts` cuatro dependencias clave dentro del ecosistema Quarkus: `quarkus-hibernate-validator`, `quarkus-oidc`, `quarkus-smallrye-openapi` y `quarkus-rest-client-jackson`.
+
+A continuación, diseccionamos cómo se configura cada pilar en nuestro código:
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+<Tabs>
+<TabItem value="validation" label="1. Bean Validation (Datos)">
+
+Protegemos la integridad de nuestra base de datos validando los DTOs de entrada directamente en la capa de **Infraestructura REST (Primary Adapters)** usando JSR-380.
+
+```java title="CreateUserDto.java"
+public class CreateUserDto {
+    @NotBlank(message = "El nombre de usuario (username) no puede ser nulo o vacío")
+    @Size(min = 5, max = 20)
+    @Pattern(regexp = "^[a-zA-Z0-9_]+$")
+    private String username;
+
+    @NotBlank
+    @Email(message = "Debe ser un formato de email válido")
+    private String email;
+}
+```
+
+:::info Manejo Global de Errores (400 Bad Request)
+Cuando una de estas reglas restrictivas se rompe, el motor lanza una `ConstraintViolationException`. Usamos un `ValidationExceptionMapper` (patrón `@Provider` de JAX-RS) para interceptarla y devolver una respuesta JSON estructurada al cliente frontal, indicando exactamente qué campos exactos fallaron para que el frontend los dibuje de rojo.
+:::
+
+</TabItem>
+<TabItem value="security" label="2. OIDC & RBAC (Seguridad)">
+
+Delegamos la validación del Token hacia Keycloak y usamos Control de Acceso Basado en Roles nativos (RBAC) para denegar el acceso a recursos protegidos.
+
+```java title="UserResource.java"
+@POST
+@RolesAllowed({"ADMIN"}) // Interceptor Quarkus OIDC cortafuegos
+public Response createUser(@Valid CreateUserDto request) { ... }
+```
+
+En el archivo `application.properties`, inyectamos las coordenadas del servidor IAM (`http://localhost:8180/realms/quarkus`) y configuramos el Facade interno:
+
+```properties title="application.properties"
+# Validador de firma local conectando a Keycloak
+quarkus.oidc.auth-server-url=http://localhost:8180/realms/quarkus
+quarkus.oidc.client-id=backend-service
+quarkus.oidc.credentials.secret=secret
+quarkus.oidc.roles.role-claim-path=realm_access/roles
+
+# El REST Client que hace el Bypass hacia Keycloak
+quarkus.rest-client.keycloak-api.url=http://localhost:8180/realms/quarkus
+```
+
+</TabItem>
+<TabItem value="openapi" label="3. OpenAPI (Documentación)">
+
+Hacemos que nuestro código fuente sea la única fuente de la verdad para la documentación, utilizando descripciones enriquecidas de **MicroProfile OpenAPI**.
+
+```java title="UserResource.java"
+@Operation(summary = "Obtener usuario por ID", description = "Retorna la tupla pública de un usuario.")
+@APIResponses(value = {
+    @APIResponse(responseCode = "200", description = "Usuario encontrado",
+                 content = @Content(schema = @Schema(implementation = UserResponseDto.class))),
+    @APIResponse(responseCode = "404", description = "No se encontró el usuario")
+})
+@GET
+@Path("/{id}")
+public Response getUserById(@PathParam("id") String id) { ... }
+```
+
+:::tip Swagger UI Interactivo
+Al ejecutar Quarkus en modo desarrollo (o forzándolo por property), se expone un portal gráfico auto-generado en `http://localhost:8080/swagger-ui`. Podrás llenar tests HTTP completos haciendo clic en los botones "Try it out", los cuales dispararán al backend respectivo validaciones y seguridad implícita.
+:::
+
+</TabItem>
+</Tabs>
+
+---
+
+## 3. Pruebas y Matriz End-to-End
+
+Asegúrate de tener tu contenedor local de Keycloak en ejecución y saneado (ver [Configuración de Keycloak](./configuracion-keycloak)).
+
+<Tabs>
+<TabItem value="scenarios" label="Escenarios de Prueba cURL">
+
+Ejecuta estas pruebas progresivas en tu Postman o cURL para comprobar cómo responden los tres pilares de defensa:
+
+1. **Prueba Bean Validation (HTTP 400)**: Obtén un Token Bearer válido, envíalo en la cabecera, pero lanza un POST con un `JSON Body` donde el campo `"email"` sea inválido (ej. `"hola"` en lugar de `"hola@email.com"`). Quarkus rechazará la solicitud inmediatamente sin tocar la base de datos.
+2. **Prueba Cortafuegos Ciego (HTTP 401)**: Envía el JSON perfecto anterior a `@POST /api/v1/users` PERO retírale el encabezado estricto `Authorization: Bearer <TOKEN>`. Obtendrás un rechazo *Unauthorized*.
+3. **Prueba Control RBAC (HTTP 403)**: Loguéate interactuando con el proxy `/auth/login` con las credenciales de un usuario del call center, rol (`OPERATOR`), inyecta su token y dispara hacia `/users`. Obtendrás *Forbidden* porque la acción es de privilegio alto `ADMIN`.
+4. **Respuesta Triunfal (HTTP 201)**: Finalmente, inyecta el Token perteneciente a un humano con el Role `ADMIN` y un body inmaculado.
+
+</TabItem>
+<TabItem value="directory" label="Evolución de Arquitectura Hexagonal">
+
+Este es el impacto que ha provocado la securización dentro de las divisiones topológicas del Hexágono:
+
+```text
+src/main/java/cja/msa/sc/security/...
+├── application/
+│   ├── port/
+│   │   └── out/
+│   │       └── AuthenticationPort.java         <- [NUEVO] Puerto de Salida (Facade)
+│   └── service/
+│       └── AuthUseCase.java                    <- [NUEVO] Lógica de Autenticación
+├── infrastructure/
+│   └── adapters/
+│       ├── in/
+│       │   └── rest/
+│       │       ├── exception/
+│       │       │   └── ValidationExceptionMapper.java  <- [NUEVO] Atrapa HTTP 400 BeanValidation
+│       │       ├── AuthResource.java                   <- [NUEVO] Adaptador REST para Login Proxy
+│       │       └── UserResource.java                   <- [MODIFICADO] Inyección de @Valid, @Roles y OpenAPI
+│       └── out/
+│           └── keycloak/
+│               ├── KeycloakAuthAdapter.java            <- [NUEVO] Adaptador Concreto IAM
+│               └── KeycloakRestClient.java             <- [NUEVO] Cliente Quarkus REST (MicroProfile)
+```
+
+</TabItem>
+</Tabs>

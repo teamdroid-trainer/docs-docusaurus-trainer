@@ -8,8 +8,8 @@ const config: Config = {
   markdown: {
     mermaid: true,
   },
-  title: 'Trainer',
-  tagline: 'Dinosaurs are cool',
+  title: 'Desarrollo Backend con Java Quarkus Masterclass',
+  tagline: 'Construye Microservicios Reactivos y Seguros con Arquitectura Limpia',
   favicon: 'img/favicon.ico',
 
 
@@ -121,14 +121,14 @@ const config: Config = {
           type: 'docSidebar',
           sidebarId: 'backendQuarkusSidebar',
           position: 'left',
-          label: 'Tutorial',
+          label: 'Tutorial Backend',
         },
-        { to: '/blog', label: 'Blog', position: 'left' },
-        {
+        //{ to: '/blog', label: 'Blog', position: 'left' },
+        /*{
           href: 'https://github.com/facebook/docusaurus',
           label: 'GitHub',
           position: 'right',
-        },
+        },*/
       ],
     },
     footer: {
@@ -174,7 +174,7 @@ const config: Config = {
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} My Project, Inc. Built with Docusaurus.`,
+      copyright: `Copyright © ${new Date().getFullYear()} Trainer, Inc. Built with Docusaurus.`,
     },
     prism: {
       theme: prismThemes.github,

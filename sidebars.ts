@@ -83,6 +83,7 @@ const sidebars: SidebarsConfig = {
       label: 'Tema 3 - APIs Reactivas',
       collapsed: true,
       items: [
+        'backend-java-quarkus/auditoria/programacion-reactiva-mutiny',
         'backend-java-quarkus/auditoria/microservicio-auditoria',
         'backend-java-quarkus/auditoria/integracion-restclient',
       ],
@@ -107,9 +108,10 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
-      label: 'Tema 6 - Arquitectura Orientada a Eventos y MFA',
+      label: 'Tema 6 - Arquitectura Orientada a Eventos',
       collapsed: true,
       items: [
+        'backend-java-quarkus/event-driven-mfa/event-driven-design',
         'backend-java-quarkus/event-driven-mfa/event-bus-mfa',
       ],
     },

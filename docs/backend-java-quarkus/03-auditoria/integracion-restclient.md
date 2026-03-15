@@ -1,111 +1,109 @@
 ---
 id: integracion-restclient
-title: "Integración Security → Audit vía RestClient"
-description: "Comunicación síncrona entre microservicios con MicroProfile RestClient y patrón AOP para auditoría"
-sidebar_position: 2
+title: "Microservicio: Integración seguridad y auditoría"
+description: "Comunicación síncrona entre microservicios con MicroProfile RestClient y patrón AOP para auditoría automatizada."
+sidebar_position: 3
 ---
 
-# Sesión 3 — Integración Security → Audit vía RestClient
+# Integración seguridad y auditoría vía RestClient
 
-## 1. Objetivo de la Sesión
+En esta sesión, conectamos el ecosistema de microservicios. Implementamos una comunicación síncrona mediante **MicroProfile RestClient** para que el servicio de seguridad delegue la persistencia de eventos de auditoría (logins, logouts, errores) al microservicio especializado, utilizando técnicas de **Programación Orientada a Aspectos (AOP)** para mantener un código limpio y desacoplado.
 
-Implementar la comunicación síncrona vía **MicroProfile RestClient** desde el microservicio `cja-msa-sc-security` hacia el microservicio `cja-msa-sc-audit` para registrar eventos de auditoría (login exitoso, login fallido, logout, acceso denegado). El objetivo es diseñar una integración limpia, didáctica, desacoplada y fácil de evolucionar.
+---
 
-## 2. Alcance Implementado
+## 1. Radiografía Visual: El Flujo de Auditoría Silenciosa
 
-- **Integración vía RestClient**: Configuración de un cliente REST declarativo para invocar el endpoint de auditoría.
-- **Envío de Auditoría**: Integración en los casos de uso de negocio relevantes (login, logout, validación de roles).
-- **Centralización**: Creación de un componente `AuditService` de infraestructura para evitar duplicación de código.
-- **Programación Orientada a Aspectos (AOP)**: Implementación de una anotación `@Auditable` y un interceptor CDI para aislar la lógica transversal de auditoría de la lógica de negocio.
+El objetivo es que los desarrolladores de negocio no tengan que preocuparse por la auditoría. Mediante una anotación personalizada, interceptamos la ejecución de los métodos para disparar una llamada asíncrona ("fire and forget") hacia el microservicio de auditoría.
 
-## 3. Dependencias Utilizadas
+```mermaid
+sequenceDiagram
+    autonumber
+    box #f8f9fa cja-msa-sc-security
+        participant R as Resource / Controller
+        participant I as AuditInterceptor (AOP)
+        participant S as AuditService (Facade)
+        participant RC as AuditRestClient
+    end
+    participant A as MSA Audit (Port 8081)
 
-```kotlin
-// MicroProfile REST Client con Jackson (Para consumir APIs externas)
+    R->>I: @Auditable Method (Login/Logout)
+    activate I
+    I->>R: Inicia ejecución del método
+    R-->>I: Retorna Resultado (O lanza Excepción)
+    
+    rect rgb(248, 249, 250)
+        Note over I, A: Proceso Transversal (Interceptado)
+        I->>S: logEvent(context, response)
+        S->>RC: sendAuditLog(AuditLogRequestDto)
+        RC-->>A: POST /api/v1/audit-logs
+    end
+    
+    I-->>R: Devuelve control al Cliente HTTP
+    deactivate I
+```
+
+:::tip Desacoplamiento AOP
+Al usar interceptores, el código de `AuthResource` no sabe que está siendo auditado. Esto nos permite agregar o quitar la auditoría de cualquier endpoint simplemente añadiendo o borrando una anotación, respetando el principio de **Responsabilidad Única**.
+:::
+
+---
+
+## 2. Configuración e Infraestructura
+
+Para habilitar esta comunicación, necesitamos registrar el cliente declarativo y configurar las coordenadas de red del servicio destino.
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+<Tabs>
+<TabItem value="config" label="1. Dependencias & Propiedades">
+
+Agregamos el soporte para clientes REST con serialización JSON en el `build.gradle.kts` del servicio Security:
+
+```kotlin title="build.gradle.kts"
 implementation("io.quarkus:quarkus-rest-client-jackson")
 ```
 
-## 4. DTOs y Contratos Utilizados
+En el archivo de configuración, definimos la URL base del microservicio de auditoría:
 
-Se define el **`AuditLogRequestDto`** que representa el body esperado por el servicio `cja-msa-sc-audit`:
-
-```java
-@Data
-@Builder
-public class AuditLogRequestDto {
-    private String functionality;
-    private String username;
-    private String eventType;
-    private String requestPayload;
-    private String responsePayload;
-    private String eventResult;
-    private String detail;
-    private String originService;
-}
+```properties title="application.properties"
+# Coordenadas del Microservicio de Auditoría
+quarkus.rest-client.audit-api.url=http://localhost:8081
 ```
 
-## 5. Configuración del Cliente REST
+</TabItem>
+<TabItem value="client" label="2. Definición del RestClient">
 
-```java
+Usamos **MicroProfile RestClient** para definir el contrato de forma declarativa. No necesitamos implementar la lógica de HTTP interna, Quarkus se encarga de ello.
+
+```java title="AuditRestClient.java"
 @RegisterRestClient(configKey = "audit-api")
 @Path("/api/v1/audit-logs")
 public interface AuditRestClient {
 
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
-    @Produces(MediaType.APPLICATION_JSON)
     void sendAuditLog(AuditLogRequestDto request);
 }
 ```
 
-Configuración en `application.properties`:
-```properties
-quarkus.rest-client.audit-api.url=http://localhost:8081
-```
+</TabItem>
+</Tabs>
 
-## 6. Servicio de Auditoría Centralizado
+---
 
-Para estructurar la llamada sin llenar de DTOs la lógica de negocio, se crea un componente que abstraiga la creación de eventos:
+## 3. Implementación del Patrón Interceptor
 
-```java
-@ApplicationScoped
-public class AuditService {
+Creamos una anotación `@Auditable` para marcar qué métodos deben disparar el registro de actividad.
 
-    @RestClient
-    AuditRestClient auditRestClient;
+<Tabs>
+<TabItem value="annotation" label="1. La Anotación (@Auditable)">
 
-    @ConfigProperty(name = "quarkus.application.name", defaultValue = "cja-msa-sc-security")
-    String applicationName;
+:::info ¿Por qué usamos @Nonbinding?
+En CDI, por defecto se busca una coincidencia exacta de los atributos. Al usar `@Nonbinding`, le indicamos a Quarkus que intercepte **todos** los métodos decorados con `@Auditable`, sin importar si el valor de `functionality` cambia entre uno y otro.
+:::
 
-    public void logEvent(String username, String functionality, String eventType,
-                         String result, String detail, String requestPayload, String responsePayload) {
-        try {
-            AuditLogRequestDto auditData = AuditLogRequestDto.builder()
-                .functionality(functionality)
-                .username(username)
-                .eventType(eventType)
-                .requestPayload(requestPayload)
-                .responsePayload(responsePayload)
-                .eventResult(result)
-                .detail(detail)
-                .originService(applicationName)
-                .build();
-
-            auditRestClient.sendAuditLog(auditData);
-        } catch(Exception e) {
-            // "Fire and forget" básico. No bloqueamos al usuario si la auditoría falla.
-            System.err.println("Failed to send audit log in Security MSA: " + e.getMessage());
-        }
-    }
-}
-```
-
-## 7. AOP / Interceptores — La Anotación `@Auditable`
-
-Para mantener los controladores REST completamente limpios de la lógica de auditoría (que es transversal), creamos un **Interceptor CDI**:
-
-**La Anotación:**
-```java
+```java title="Auditable.java"
 @InterceptorBinding
 @Target({ElementType.METHOD, ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
@@ -118,53 +116,57 @@ public @interface Auditable {
 }
 ```
 
-> **¿Por qué usamos `@Nonbinding`?**
-> En CDI, cuando un Interceptor está asociado a una anotación con atributos, el contenedor busca una coincidencia **exacta** de todos los valores definidos. Al marcar los atributos con `@Nonbinding`, le indicamos a Quarkus que intercepte **todos** los métodos decorados con `@Auditable`, ignorando el valor específico pasado a cada atributo.
+</TabItem>
+<TabItem value="interceptor" label="2. El Interceptor">
 
-**Uso en el Resource:**
-```java
-@POST
-@Path("/login")
-@Auditable(functionality = "SECURITY_LOGIN", eventType = "LOGIN_ATTEMPT")
-public Response login(LoginRequestDto loginRequest) {
-    // Si la autenticación pasa se dispara LOGIN_SUCCESS interceptado.
-    // Si lanza una Exception, el interceptor captura ERROR / EVENT_DENIED
-    return Response.ok(authService.login(loginRequest)).build();
+Este componente "envuelve" la ejecución del método, captura los payloads y el resultado, y coordina el envío de datos.
+
+```java title="AuditInterceptor.java"
+@Auditable @Interceptor @Priority(2020)
+public class AuditInterceptor {
+    @Inject AuditService auditService;
+
+    @AroundInvoke
+    public Object auditMethod(InvocationContext context) throws Exception {
+        // 1. Antes: Extrae metadatos de la anotación
+        // 2. Ejecuta el método original
+        Object result = context.proceed();
+        // 3. Después: Envía auditoría asíncrona
+        auditService.logEvent(...);
+        return result;
+    }
 }
 ```
 
-## 8. Limitaciones Intencionales de esta Sesión
+</TabItem>
+</Tabs>
 
-- **Resiliencia Básica:** No se agregaron Circuit Breakers, Fallbacks o colas de mensajería. La llamada es síncrona estilo "fire and forget".
-- **Gestión de Errores Compleja:** En un entorno bancario real, si la auditoría falla, podría encolarse localmente para reintentos. Esto se omite para mantener la sesión didáctica.
+---
 
-## 9. Estructura del Proyecto (Archivos modificados y nuevos)
+## 4. Estructura del Proyecto
+
+La integración se organiza dentro de la capa de infraestructura, separando los adaptadores externos de la lógica transversal de AOP.
 
 ```text
-cja-msa-sc-security/
-├── build.gradle.kts                                [Se verificó quarkus-rest-client-jackson]
-└── src/
-    └── main/
-        ├── java/cja/msa/sc/security/
-        │   └── infrastructure/
-        │       ├── adapters/
-        │       │   ├── in/rest/
-        │       │   │   ├── AuthResource.java       [MODIFICADO: Mapeos @Auditable]
-        │       │   │   └── UserResource.java       [MODIFICADO: Mapeos @Auditable]
-        │       │   └── out/rest/audit/             [NUEVO DIRECTORIO]
-        │       │       ├── AuditRestClient.java    [NUEVO: Contrato MicroProfile RestClient]
-        │       │       ├── AuditService.java       [NUEVO: Servicio unificador y Fire-And-Forget]
-        │       │       └── dto/
-        │       │           └── AuditLogRequestDto.java [NUEVO]
-        │       └── aop/                            [NUEVO DIRECTORIO]
-        │           ├── Auditable.java              [NUEVO: Anotación con @Nonbinding]
-        │           └── AuditInterceptor.java       [NUEVO: Extractor de payloads y usuario]
-        └── resources/
-            └── application.properties              [MODIFICADO: URL audit-api y puerto 8082]
+src/main/java/cja/msa/sc/security/infrastructure/
+├── aop/
+│   ├── Auditable.java              <- Enlace del Interceptor
+│   └── AuditInterceptor.java       <- Lógica de captura
+└── adapters/out/rest/audit/
+    ├── AuditRestClient.java        <- Cliente MicroProfile
+    ├── AuditService.java           <- Fachada de infraestructura
+    └── dto/
+        └── AuditLogRequestDto.java <- Contrato de envío
 ```
 
-## 10. Próximos Pasos Sugeridos
+---
 
-1. **Asincronismo:** Migrar REST Client a un modelo reactivo (`@RestClient` devolviendo `Uni<Void>`).
-2. **Identidad del Usuario:** Extraer el `username` mediante el contexto de seguridad de Quarkus (`SecurityIdentity`).
-3. **Resiliencia Avanzada:** Implementar Fault Tolerance con `@Retry` y `@Fallback` (ver Sesión 5).
+## 5. Limitaciones y Consideraciones
+
+:::caution Fire and Forget
+En esta fase, la llamada es síncrona bajo un patrón de "enviar y olvidar" dentro de un bloque `try-catch`. 
+- **Riesgo**: Si el servicio de auditoría tarda mucho, impactará el tiempo de respuesta del login.
+- **Solución futura**: Migrar a llamadas reactivas con `Uni<Void>` o usar colas de mensajería (Kafka/RabbitMQ) para un desacoplado total.
+:::
+
+Accede a la documentación del **[Microservicio de Auditoría](./microservicio-auditoria)** para entender cómo se procesan estos eventos una vez recibidos.

@@ -1,36 +1,118 @@
 /**
- * Any CSS included here will be global. The classic template
- * bundles Infima by default. Infima is a CSS framework designed to
- * work well for content-centric websites.
+ * Java Quarkus Masterclass - Premium Global Styles
  */
 
-/* You can override the default Infima variables here. */
 :root {
-  --ifm-color-primary: #2e8555;
-  --ifm-color-primary-dark: #29784c;
-  --ifm-color-primary-darker: #277148;
-  --ifm-color-primary-darkest: #205d3b;
-  --ifm-color-primary-light: #33925d;
-  --ifm-color-primary-lighter: #359962;
-  --ifm-color-primary-lightest: #3cad6e;
-  --ifm-code-font-size: 95%;
-  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
-  --doc-sidebar-width: 370px !important;
-
-  --ifm-font-size-base: 112%;
-  /* Por defecto es 100%, ajústalo hacia arriba o abajo */
-  --ifm-line-height-base: 1.6;
-  /* Opcional: Para darle más espacio entre renglones */
+  /* Premium Slate & Sapphire Palette */
+  --ifm-color-primary: #2563eb;
+  --ifm-color-primary-dark: #1d4ed8;
+  --ifm-color-primary-darker: #1e40af;
+  --ifm-color-primary-darkest: #1e3a8a;
+  --ifm-color-primary-light: #60a5fa;
+  --ifm-color-primary-lighter: #93c5fd;
+  --ifm-color-primary-lightest: #eff6ff;
+  
+  --ifm-background-color: #ffffff;
+  --ifm-footer-background-color: #0f172a;
+  
+  --site-gradient: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+  --accent-gradient: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  
+  --ifm-h1-font-size: 3rem;
+  --ifm-h2-font-size: 2.25rem;
+  --ifm-h3-font-size: 1.75rem;
+  
+  --doc-sidebar-width: 300px !important;
+  --ifm-navbar-background-color: rgba(255, 255, 255, 0.82);
 }
 
-/* For readability concerns, you should choose a lighter palette in dark mode. */
 [data-theme='dark'] {
-  --ifm-color-primary: #25c2a0;
-  --ifm-color-primary-dark: #21af90;
-  --ifm-color-primary-darker: #1fa588;
-  --ifm-color-primary-darkest: #1a8870;
-  --ifm-color-primary-light: #29d5b0;
-  --ifm-color-primary-lighter: #32d8b4;
-  --ifm-color-primary-lightest: #4fddbf;
-  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+  --ifm-color-primary: #60a5fa;
+  --ifm-background-color: #0f172a;
+  --ifm-navbar-background-color: rgba(15, 23, 42, 0.82);
+  --site-gradient: linear-gradient(180deg, #10192e 0%, #0f172a 100%);
+  --ifm-footer-background-color: #0b1120;
+}
+
+/* Luxury Typography & UI Refinements */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, .hero__title {
+  letter-spacing: -0.02em;
+  font-weight: 700;
+}
+
+.navbar {
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+[data-theme='dark'] .navbar {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.hero--primary {
+  background: var(--site-gradient);
+  color: var(--ifm-font-color-base);
+  padding: 5rem 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+[data-theme='dark'] .hero--primary {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.glass-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--ifm-background-color);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 20px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+[data-theme='dark'] .glass-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+}
+
+.glass-card:hover {
+  transform: translateY(-6px);
+  border-color: var(--ifm-color-primary);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, var(--ifm-color-primary) 0%, #6366f1 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.premium-button {
+  background: #25c2a0; /* Docusaurus Green */
+  color: white !important;
+  border-radius: 12px;
+  padding: 0.8rem 2rem;
+  font-weight: 600;
+  border: none;
+  transition: all 0.3s ease;
+}
+
+.premium-button:hover {
+  background: #21af90;
+  transform: scale(1.02);
+  box-shadow: 0 10px 20px rgba(37, 194, 160, 0.2);
+}
+
+[data-theme='dark'] .premium-button {
+  background: #25c2a0;
+  color: white !important;
 }

@@ -1,27 +1,23 @@
 ---
 id: fault-tolerance
 title: "Resiliencia y Tolerancia a Fallos"
-description: "Protección de microservicios con @Timeout, @Retry, @CircuitBreaker y @Fallback de MicroProfile Fault Tolerance"
+description: "Protección de microservicios con @Timeout, @Retry, @CircuitBreaker y @Fallback de MicroProfile Fault Tolerance."
 sidebar_position: 1
 ---
 
-# Endpoints Resilientes en Security
+# Resiliencia y Tolerancia a Fallos
 
-## 1. Objetivo de la Sesión
-Introducir el concepto de **Resiliencia (Tolerancia a Fallos)** en la comunicación entre microservicios, específicamente protegiendo a `cja-msa-sc-security` contra inestabilidades del microservicio `cja-msa-sc-audit`.
+Protegemos el microservicio `cja-msa-sc-security` contra las inestabilidades del servicio de auditoría (`cja-msa-sc-audit`) con cuatro anotaciones de **MicroProfile Fault Tolerance** que se apilan como capas de defensa. Si una falla, activamos la siguiente.
 
-## 2. Dependencia Principal
-```kotlin
-implementation("io.quarkus:quarkus-smallrye-fault-tolerance")
-```
+:::info Principio de Resiliencia
+No se trata de **si** un sistema va a fallar, sino de **cuándo** y **cómo** nos recuperamos. En arquitecturas distribuidas, la red no es confiable, la latencia no es cero y los servidores no son inmortales. La resiliencia es el escudo que garantiza que un componente débil **jamás** provoque un efecto dominó.
+:::
 
-## 3. ¿Por qué la Resiliencia es Indispensable?
+---
 
-> *"No se trata de **si** un sistema va a fallar, sino de **cuándo** lo hará y **cómo** te vas a recuperar."*
+## 1. Radiografía Visual: El Escenario del Colapso
 
-En arquitecturas distribuidas, **la red no es confiable, la latencia no es cero y los servidores no son inmortales**. La resiliencia es el escudo que garantiza que un componente débil o caído (ej. `audit`) **jamás** provoque un efecto dominó que arrastre a la muerte a los componentes sanos que lo consumen (ej. `security`).
-
-### Diagrama del Caso de Uso
+Este diagrama muestra el caso real que nos motivó: el login de un usuario **nunca debe verse afectado** por una caída del servicio de auditoría.
 
 ```mermaid
 sequenceDiagram
@@ -29,56 +25,66 @@ sequenceDiagram
     participant Security
     participant Audit
 
-    Frontend->>Security: POST /login (Intentar iniciar sesión)
-    Note over Security: Autorizado (Ej. Redis / Keycloak)
-    Security-->>Frontend: HTTP 200 OK + JWT (Respuesta ¡Veloz!)
+    Frontend->>Security: POST /login
+    Note over Security: Valida credenciales (Keycloak / Redis)
+    Security-->>Frontend: HTTP 200 OK + JWT ← El usuario ya tiene su respuesta
 
-    Note over Security, Audit: Proceso en Background (AOP)
+    Note over Security, Audit: Proceso en background (AOP)
     Security->>Audit: POST /audit (Enviar bitácora)
 
     alt Audit está SANO
         Audit-->>Security: HTTP 201 Created
-        Note over Security: Tarea finalizada con éxito.
     else Audit está CAÍDO / LENTO
         Audit--xSecurity: Timeout / Error 503
-        Note over Security: ⚡ Actuamos de inmediato.
-        Security->>Security: Se guarda log de Fallback (System.out / Local File)
-        Note over Security: Resiliencia Triunfante. El usuario NUNCA notó la falla.
+        Security->>Security: @Fallback → log local
+        Note over Security: Resiliencia triunfante. El usuario nunca lo notó.
     end
 ```
 
 ---
 
-## 4. `@Timeout` — Límite de Tiempo de Espera
+## 2. Las Cuatro Capas de Defensa
 
-**Fija un límite estricto** al tiempo que una parte del sistema está dispuesta a esperar por una respuesta. Si ese límite se alcanza, la invocación se considera fallida inmediatamente, liberando los hilos bloqueados.
+```kotlin title="build.gradle.kts"
+implementation("io.quarkus:quarkus-smallrye-fault-tolerance")
+```
+
+Las anotaciones se aplican en cascada sobre el mismo método. El orden de evaluación es: **Timeout → Retry → CircuitBreaker → Fallback**.
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+<Tabs>
+<TabItem value="timeout" label="1. @Timeout">
+
+**Fija un límite estricto** de espera. Si la llamada supera el umbral, lanza una `TimeoutException` inmediatamente, liberando el hilo.
 
 ```mermaid
 sequenceDiagram
     participant Security
     participant Audit
 
-    Note over Security, Audit: Con @Timeout(1000)
     Security->>Audit: POST /audit
     Note right of Audit: (1 seg transcurrido)
-    Note over Security: ⚡ Corta la conexión (Lanza TimeoutException)
+    Note over Security: ⚡ Corta la conexión (TimeoutException)
     Security-->>Cliente: Continúa su proceso rápidamente
 ```
 
-**Escenario Real:** Pasarela de Pagos Lenta — Si un banco no responde en 3 segundos, abortar y mostrar "Intente nuevamente", sin saturar los servidores.
-
-```java
-@Timeout(value = 1000) // 1 segundo = 1000 ms
+```java title="AuditService.java"
+@Timeout(value = 1000) // Máximo 1 segundo de espera
 public void logEvent(...) {
     auditRestClient.sendAuditLog(auditData);
 }
 ```
 
----
+:::tip Caso de uso real
+Pasarela de Pagos lenta: si el banco no responde en 3 segundos, abortar y mostrar "Intente nuevamente", sin saturar los hilos del servidor.
+:::
 
-## 5. `@Retry` — Reintento Automático
+</TabItem>
+<TabItem value="retry" label="2. @Retry">
 
-Permite que una operación fallida se intente de nuevo automáticamente antes de aceptar la derrota. Útil para **Fallos Transitorios (Transient Failures)**: errores que ocurren por un micro-segundo.
+Permite que una operación fallida se intente de nuevo automáticamente. Útil para **fallos transitorios** (micro-cortes de red, pods reiniciando).
 
 ```mermaid
 sequenceDiagram
@@ -86,162 +92,138 @@ sequenceDiagram
     participant Audit
 
     Security->>Audit: POST /audit (Intento 1)
-    Audit--xSecurity: Falla (ej. Network Drop 503)
-    Note over Security: Espera 200ms (@Retry)
+    Audit--xSecurity: Falla (503)
+    Note over Security: Espera 200ms
     Security->>Audit: POST /audit (Intento 2)
-    Audit--xSecurity: Falla (ej. Network Drop 503)
-    Note over Security: Espera 200ms (@Retry)
+    Audit--xSecurity: Falla (503)
+    Note over Security: Espera 200ms
     Security->>Audit: POST /audit (Intento 3)
-    Audit-->>Security: 200 OK ✅ Se salvó el Request!
+    Audit-->>Security: 200 OK ✅
 ```
 
-**Escenario Real:** Pods de Kubernetes reiniciando — Con `@Retry(maxRetries = 3, delay = 500)`, el sistema detecta la falla, espera, y el pod ya arrancó para el segundo intento.
-
-```java
-@Retry(maxRetries = 2, delay = 200) // Máximo 2 reintentos extra, esperando 200ms entre ellos
+```java title="AuditService.java"
+@Retry(maxRetries = 2, delay = 200) // 2 reintentos extra, 200ms entre ellos
 public void logEvent(...) { ... }
 ```
 
----
+:::info Caso de uso real
+Pods de Kubernetes reiniciando: el sistema detecta la falla, espera 200ms, y el pod ya arrancó para el segundo intento.
+:::
 
-## 6. `@CircuitBreaker` — Interruptor de Circuito
+</TabItem>
+<TabItem value="circuit-breaker" label="3. @CircuitBreaker">
 
-Un **Interruptor Térmico** de software. Si las peticiones hacia otro servicio están fallando sistemáticamente, "corta la corriente" para evitar ahogar al otro servicio.
-
-**3 estados:**
-- **Cerrado (Closed):** Todo está sano, las peticiones fluyen con normalidad.
-- **Abierto (Open):** Si X cantidad de errores ocurren, "Salta" el taco. Las peticiones ni siquiera viajan por red.
-- **Semi-Abierto (Half-Open):** Al pasar cierto tiempo (`delay`), se lanza 1 petición de prueba. Si es exitosa, se CIERRA el circuito.
+Un **interruptor térmico** de software. Si los fallos son sistemáticos, corta el flujo para no ahogar al servicio caído, dejando tiempo para que se recupere.
 
 ```mermaid
 flowchart TD
     Inicio(( )) --> CLOSED
 
-    subgraph Sano [Operación Normal]
+    subgraph Sano ["Operación Normal"]
         CLOSED["Estado: CERRADO 🟩<br>El tráfico fluye hacia Audit"]
         CLOSED -- Éxitos continuos --> CLOSED
     end
 
-    CLOSED -- "Falla el 40% de 10 peticiones<br>(Umbral superado)" --> OPEN
+    CLOSED -- "40% de fallos en 10 peticiones" --> OPEN
 
-    subgraph Caida [Servicio Caído]
-        OPEN["Estado: ABIERTO 🟥<br>El 'breaker' saltó"]
-        OPEN -- Nuevas peticiones --> Rechazo["Se rechazan y van al<br>@Fallback de inmediato"]
+    subgraph Caida ["Servicio Caído"]
+        OPEN["Estado: ABIERTO 🟥<br>El breaker saltó"]
+        OPEN -- Nuevas peticiones --> Rechazo["Se redirigen al @Fallback"]
     end
 
-    OPEN -- "Pasa el tiempo de<br>espera delay=5000ms" --> HALF_OPEN
+    OPEN -- "delay = 5000ms transcurrido" --> HALF_OPEN
 
-    subgraph Prueba [Modo de Recuperación]
-        HALF_OPEN["Estado: SEMI-ABIERTO 🟨<br>Deja pasar UNA petición de prueba"]
-        HALF_OPEN -. "La prueba falla" .-> OPEN
-        HALF_OPEN -. "La prueba es exitosa" .-> CLOSED
+    subgraph Prueba ["Modo de Recuperación"]
+        HALF_OPEN["Estado: SEMI-ABIERTO 🟨<br>Una petición de prueba"]
+        HALF_OPEN -. "Prueba falla" .-> OPEN
+        HALF_OPEN -. "Prueba exitosa" .-> CLOSED
     end
 
-    style CLOSED fill:#d4edda,stroke:#28a745,stroke-width:2px
-    style OPEN fill:#f8d7da,stroke:#dc3545,stroke-width:2px
-    style HALF_OPEN fill:#fff3cd,stroke:#ffc107,stroke-width:2px
+    style CLOSED fill:#d4edda,stroke:#28a745
+    style OPEN fill:#f8d7da,stroke:#dc3545
+    style HALF_OPEN fill:#fff3cd,stroke:#ffc107
 ```
 
-```java
-// 1. Evalúa las últimas 10 llamadas
-// 2. Si 4 o más fallan (failureRatio = 0.4) → ABRE el circuito por 5000ms
+```java title="AuditService.java"
+// Abre el circuito si 4/10 llamadas fallan. Lo mantiene abierto 5 segundos.
 @CircuitBreaker(requestVolumeThreshold = 10, failureRatio = 0.4, delay = 5000)
 public void logEvent(...) { ... }
 ```
 
----
+</TabItem>
+<TabItem value="fallback" label="4. @Fallback">
 
-## 7. `@Fallback` — Plan B / Graceful Degradation
+El **Plan B definitivo**. Si todas las capas anteriores fallan, un método alternativo provee una respuesta degradada en lugar de propagar el error.
 
-El patrón de **Mitigación** definitiva. ¿Qué debe hacer tu backend si todas las opciones anteriores fallan? Un `@Fallback` proporciona un camino algorítmico secundario que atrapa el error y provee datos cacheados o un reporte silenciado.
-
-```mermaid
-flowchart LR
-    Invoca[Llamada API] --> Req{¿API Sano?}
-    Req -- Sí --> Win("Respuesta normal")
-    Req -- "Falla/Circuit Abierto" --> FB["🔥 Método @Fallback"]
-    FB --> FB_Data("Retorna respuesta alternativa o log local")
-    Win --> Cliente
-    FB_Data --> Cliente
-```
-
-```java
+```java title="AuditService.java"
 @Timeout(1000)
 @Retry(maxRetries = 2, delay = 200)
 @CircuitBreaker(requestVolumeThreshold = 10, failureRatio = 0.4, delay = 5000)
 @Fallback(fallbackMethod = "logEventFallback")
 public void logEvent(...) { ... }
 
-// El Throwable t permite identificar QUÉ política disparó el fallback
+// El throwable permite saber exactamente QUÉ política disparó el fallback
 public void logEventFallback(..., Throwable t) {
     if (t instanceof TimeoutException) {
-        log.warn("🚨 @Timeout detonado");
+        log.warn("🚨 @Timeout detonado — Audit no respondió a tiempo");
     } else if (t instanceof CircuitBreakerOpenException) {
-        log.warn("🚨 @CircuitBreaker Abierto");
+        log.warn("🚨 @CircuitBreaker abierto — Audit en modo de recuperación");
     } else {
-        log.warn("🚨 Excepción de @Retry agotado o fallo general");
+        log.warn("🚨 @Retry agotado — Fallo persistente en Audit");
     }
 }
 ```
 
+:::caution Degradación Elegante
+El `@Fallback` **no arregla el problema**, lo contiene. El microservicio de auditoría sigue caído, pero la experiencia del usuario es intacta. El log de fallback sirve como evidencia técnica para el equipo de operaciones.
+:::
+
+</TabItem>
+</Tabs>
+
 ---
 
-## 8. Flujo Completo con Resiliencia Activa
+## 3. El Flujo Completo con Todas las Capas Activas
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant Cliente as Frontend / App
-    box lightblue cja-msa-sc-security
+    box #f8f9fa cja-msa-sc-security
         participant Auth as AuthService
         participant AOP as AuditInterceptor
         participant AuditSvc as AuditService
     end
     participant AuditMSA as cja-msa-sc-audit
 
-    Cliente->>Auth: 1. POST /api/v1/auth/login
-    Note over Auth: Verifica Redis Toggle / Keycloak
-    Auth-->>Cliente: 2. HTTP 200 OK (JWT)
+    Cliente->>Auth: POST /api/v1/auth/login
+    Auth-->>Cliente: HTTP 200 OK (JWT)
 
-    Note over AOP, AuditMSA: Proceso asíncrono y Desacoplado
-    AOP->>AuditSvc: 3. Intercepta y llama a logEvent()
+    Note over AOP, AuditMSA: Proceso asíncrono y desacoplado
+    AOP->>AuditSvc: Intercepta y llama a logEvent()
 
     rect rgb(255, 240, 240)
         Note over AuditSvc, AuditMSA: Resiliencia Activa
-        AuditSvc->>AuditMSA: Llama a POST /audit (Intento 1)
-        AuditMSA--xAuditSvc: Falla Timeout (>1000ms)
-
-        AuditSvc->>AuditMSA: @Retry: Intento 2 (Espera 200ms)
+        AuditSvc->>AuditMSA: POST /audit (Intento 1)
+        AuditMSA--xAuditSvc: Falla — Timeout >1000ms
+        AuditSvc->>AuditMSA: @Retry Intento 2 (espera 200ms)
         AuditMSA--xAuditSvc: Falla (HTTP 500)
-
-        AuditSvc->>AuditMSA: @Retry: Intento 3
+        AuditSvc->>AuditMSA: @Retry Intento 3
         AuditMSA--xAuditSvc: Falla (HTTP 500)
     end
 
-    Note over AuditSvc: Se agotan los reintentos (o se abre el @CircuitBreaker)
-    AuditSvc->>AuditSvc: 4. Ejecuta @Fallback = logEventFallback()
-    Note over AuditSvc: SLF4J log: "⚠️ [FALLBACK] Evidencia técnica guardada"
+    AuditSvc->>AuditSvc: @Fallback → logEventFallback()
+    Note over AuditSvc: ⚠️ Evidencia guardada en log local
 ```
 
-## 9. Configuración Necesaria
+---
 
-```properties
-# application.properties
-# Feature toggle para Redis (puede desactivarse sin apagar el servicio)
-security.login.redis.enabled=false
-```
-
-## 10. Estructura Actualizada del Proyecto
+## 4. Estructura del Proyecto
 
 ```text
 cja-msa-sc-security/
-├── build.gradle.kts (Added quarkus-smallrye-fault-tolerance)
+├── build.gradle.kts                              <- Añadida: quarkus-smallrye-fault-tolerance
 └── src/main/java/cja/msa/sc/security/
-    ├── application/
-    │   └── service/
-    │       └── AuthService.java (Modificado: flag de Redis isRedisEnabled)
-    └── infrastructure/
-        └── adapters/
-            └── out/rest/audit/
-                └── AuditService.java (Modificado: @Retry, @Timeout, @CircuitBreaker, @Fallback)
+    └── infrastructure/adapters/out/rest/audit/
+        └── AuditService.java                     <- [MODIFICADO] @Timeout @Retry @CircuitBreaker @Fallback
 ```

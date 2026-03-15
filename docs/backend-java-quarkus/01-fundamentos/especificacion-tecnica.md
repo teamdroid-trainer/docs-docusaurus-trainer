@@ -1,111 +1,23 @@
 ---
 id: especificacion-tecnica
-title: "Desarrollo del tema"
+title: "Microservicio: Construcción y Especificación Técnica"
 description: "Base técnica del microservicio de seguridad: Hexagonal Architecture, Quarkus, Lombok y MapStruct"
 sidebar_position: 6
 ---
 
-# Desarrollo del tema
+# Construcción del Microservicio: Especificación Técnica
+
+Esta sesión establece la **base técnica definitiva** para la creación de nuestro microservicio de seguridad `cja-msa-sc-security`. El objetivo es comprender cómo orquestar un microservicio cloud-native profesional con Quarkus, guiado estrictamente por **Hexagonal Architecture**.
+
+:::tip Objetivo Práctico
+Aprenderás a organizar capas sin acoplamiento, configurar un proyecto Quarkus con Gradle Kotlin DSL, y utilizar Lombok y MapStruct para mantener el código elegante y escalable.
+:::
 
 ---
 
-## 1. Propósito de la Sesión
+## 1. Arquitectura Visual: Radiografía del Microservicio
 
-Esta sesión establece la **base técnica** para la creación de un microservicio de seguridad. El objetivo es entender cómo se estructura un microservicio profesional con Quarkus siguiendo **Hexagonal / Clean Architecture**, sin implementar lógica de negocio compleja todavía.
-
-**Qué aprenderás en esta sesión:**
-- Cómo organizar capas en una arquitectura hexagonal
-- Cómo configurar un proyecto Quarkus desde cero con Gradle Kotlin DSL
-- Cómo diseñar endpoints REST bien estructurados
-- Cómo separar responsabilidades entre dominio, aplicación e infraestructura
-- Cómo usar Lombok y MapStruct para escribir código más limpio
-
----
-
-## 2. Stack Tecnológico
-
-| Herramienta        | Versión       | Rol                                      |
-|--------------------|---------------|------------------------------------------|
-| **Java**           | 25 (EA)       | Lenguaje principal                       |
-| **Quarkus**        | 3.32.2        | Framework de microservicios              |
-| **Gradle**         | 8.x           | Build tool (Kotlin DSL)                  |
-| **Lombok**         | 1.18.36       | Reducción de boilerplate Java            |
-| **MapStruct**      | 1.6.3         | Mapeo entre capas (DTO ↔ Dominio)        |
-| **Jackson**        | (via Quarkus) | Serialización/deserialización JSON       |
-| **SmallRye Health**| (via Quarkus) | Health checks para Kubernetes            |
-| **RESTEasy**       | (via Quarkus) | Implementación JAX-RS para endpoints REST|
-
-### Prerrequisitos del entorno
-
-```bash
-# Verificar versiones instaladas
-java -version      # Debe ser Java 25 EA o Java 21 LTS
-gradle -version    # Debe ser 8.x
-```
-
-> **Nota:** Si no tienes Java 25, puedes usar Java 21 LTS cambiando `VERSION_25` → `VERSION_21` en `build.gradle.kts` y eliminando `--enable-preview`.
-
----
-
-## 3. Estructura de Carpetas
-
-```
-cja-msa-sc-security/
-├── build.gradle.kts                    # Build script con todas las dependencias
-├── settings.gradle.kts                 # Nombre del proyecto Gradle
-├── gradle.properties                   # Versiones de Quarkus (BOM)
-├── gradlew / gradlew.bat               # Gradle Wrapper (no requiere Gradle instalado)
-└── src/
-    └── main/
-        ├── java/cja/msa/sc/security/
-        │   ├── domain/                         # Núcleo del dominio
-        │   │   ├── model/
-        │   │   │   ├── User.java               # Entidad principal
-        │   │   │   └── enums/
-        │   │   │       ├── UserRole.java       # Enum de roles
-        │   │   │       └── UserStatus.java     # Enum de estados
-        │   │   └── exception/
-        │   │       └── UserNotFoundException.java
-        │   │
-        │   ├── application/                    # Capa de aplicación
-        │   │   ├── port/
-        │   │   │   ├── in/                     # Lo que la aplicación OFRECE
-        │   │   │   │   └── UserQueryUseCase.java
-        │   │   │   └── out/                    # Lo que la aplicación NECESITA
-        │   │   │       └── UserRepository.java
-        │   │   └── service/
-        │   │       └── UserQueryService.java   # Implementa UserQueryUseCase
-        │   │
-        │   ├── infrastructure/                 # Capa de Infraestructura
-        │   │   └── adapters/
-        │   │       ├── in/
-        │   │       │   └── rest/               # Adaptadores de Entrada (Endpoint API)
-        │   │       │       ├── dto/
-        │   │       │       │   ├── request/
-        │   │       │       │   │   └── CreateUserDto.java
-        │   │       │       │   └── response/
-        │   │       │       │       └── UserResponseDto.java
-        │   │       │       ├── mapper/
-        │   │       │       │   └── UserRestMapper.java
-        │   │       │       ├── exception/
-        │   │       │       │   └── GlobalExceptionMapper.java
-        │   │       │       ├── HealthResource.java
-        │   │       │       └── UserResource.java
-        │   │       └── out/
-        │   │           └── persistence/        # Adaptadores de Salida (Base de Datos)
-        │   │               └── InMemoryUserRepository.java
-        │
-        └── resources/
-            └── application.properties          # Configuración de Quarkus
-```
-
----
-
-## 4. Arquitectura Hexagonal (Ports & Adapters)
-
-### Concepto Central
-
-La arquitectura hexagonal (también llamada **Ports & Adapters**) separa el núcleo de la aplicación del mundo exterior mediante **puertos** (interfaces) y **adaptadores** (implementaciones concretas).
+Comprender el flujo de los datos es el primer paso antes de escribir una sola línea de código. Nuestro microservicio está diseñado para proteger el núcleo (Dominio) de cualquier contaminación externa.
 
 ```mermaid
 flowchart TD
@@ -176,169 +88,152 @@ flowchart TD
     MemMock ~~~ DbReal
 ```
 
-### Regla de Dependencias
-
-> **Las dependencias solo fluyen HACIA el dominio, nunca desde él.**
-
-- `domain/` → no importa nada de otras capas
-- `application/` → solo importa `domain/`
-- `infrastructure/` → importa `domain/` (para implementar los puertos de salida)
-- `entrypoints/` → importa `application/` y `domain/`
+> **Las dependencias fluyen única y exclusivamente hacia el centro luminoso (Dominio).**
 
 ---
 
-## 5. Descripción de las Capas
+## 2. Decisiones Técnicas: El Stack Elegido
 
-### Domain — El Núcleo
+Para construir un sistema de grado bancario/fintech, la elección de la tecnología no es casualidad. Hemos seleccionado herramientas orientadas al rendimiento extremo (Cloud-Native) y la mantenibilidad a largo plazo bajo la protección de la JVM.
 
-**Qué hay:** Entidades, Value Objects, Enums, Excepciones de dominio.
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
-**Regla de oro:** Esta capa NO importa ningún framework. Si ves `import jakarta.*` o `import io.quarkus.*` dentro de `domain/`, algo está mal. El dominio es puro y sin puertos.
+<Tabs>
+<TabItem value="core" label="El Motor: Quarkus & Java">
 
-**Archivos clave:**
-- `User.java` — Entidad principal. Modela la identidad de un usuario.
+| Herramienta | Versión | Rol |
+|---|---|---|
+| **Java** | 25 (EA) | Lenguaje principal (o Java 21 LTS) |
+| **Quarkus** | 3.32.2 | Framework Cloud-Native de Microservicios |
+| **Gradle** | 8.x | Gestor de compilación (Kotlin DSL) |
 
-### Application — Orquestación
+**¿Por qué Quarkus en lugar del tradicional Spring Boot?**
+- **Arranque Supersónico**: Levanta en `< 500ms` (frente a los 3-5s típicos de Spring).
+- **Consumo de Memoria Reducido**: Requiere habitualmente un 40-60% menos de memoria RAM, volviéndolo ideal para alta densidad de contenedores en Kubernetes.
+- **GraalVM**: Viene listo de fábrica para compilarse a binario nativo (AOT) sin las fricciones históricas de reflexión profunda.
 
-**Qué hay:** Casos de uso (Puertos In), Casos de persistencia (Puertos Out), Servicios de aplicación que implementan esos puertos de entrada.
+</TabItem>
+<TabItem value="tools" label="Herramientas de Productividad">
 
-**Regla de oro:** Orquesta, no implementa lógica de negocio compleja. Llama al dominio y a los puertos de salida, y expone operaciones al exterior a través de puertos de entrada.
+| Herramienta | Versión | Rol |
+|---|---|---|
+| **Lombok** | 1.18.36 | Eliminación absoluta de código boilerplate (Getters, Builders). |
+| **MapStruct** | 1.6.3 | Mapeo ultra-rápido entre entidades de Dominio puro y DTOs de Infraestructura HTTP. |
+| **SmallRye Health** | Integrado | Telemetría Liveness/Readiness exigidos por Kubernetes. |
 
-**Archivos clave:**
-- `UserQueryUseCase.java` — Puerto de entrada: define QUÉ puede hacer el servicio.
-- `UserRepository.java` — Puerto de salida: define QUÉ necesita del exterior.
-- `UserQueryService.java` — Implementa `UserQueryUseCase`. Consulta usuarios usando el `UserRepository`.
+**¿Por qué MapStruct en lugar de Reflection (ModelMapper)?**
+- **Velocidad de Ejecución Absoluta**: MapStruct **no usa reflexión en runtime**. Genera el código mapeador real en tiempo de compilación, resultando entre 10x y 100x más rápido.
+- **Seguridad Garantizada en Compilación**: Si un campo cambia de nombre en el Dominio y el mapeo se rompe, *tu proyecto directamente no compilará*, evitando fallos silenciosos y caóticos en producción.
 
-### Infrastructure — Adaptadores
-
-**Qué hay:** Implementaciones de repositorios, clientes HTTP externos, adaptadores de mensajería, Recursos REST JAX-RS, manejadores de excepciones, DTOs y Mappers vinculados a estos frameworks.
-
-**Patrón:** Convierten solicitudes externas hacia puertos de entrada, o implementan puertos de salida llamando a sistemas externos.
-
-**Archivos clave:**
-- `InMemoryUserRepository.java` — Implementación mock del puerto `UserRepository`.
-- `HealthResource.java` y `UserResource.java` — Exponen endpoints de la API.
-- `UserRestMapper.java` — MapStruct: Convierte el dominio hacia DTOs para la respuesta HTTP.
-- `CreateUserDto.java`, `UserResponseDto.java` y `GlobalExceptionMapper.java` — Componentes ligados al protocolo REST.
+</TabItem>
+</Tabs>
 
 ---
 
-## 6. Librerías Utilizadas
+## 3. Anatomía del Proyecto: Capas y Directorios
 
-### Quarkus (Framework Principal)
-Quarkus es un framework de Java diseñado para microservicios cloud-native. A diferencia de Spring Boot, Quarkus está optimizado para:
-- **Tiempo de arranque ultra-rápido** (decenas de ms vs segundos)
-- **Huella de memoria reducida** (ideal para contenedores)
-- **GraalVM Native Image** (compilar a binario nativo sin JVM)
+El código fuente debe "gritar" lo que el sistema hace, no qué framework utiliza. Esta es la estructura topológica exacta de las capas de nuestro ecosistema.
 
-### Lombok
-Lombok genera código Java estándar en tiempo de compilación mediante annotations.
-```java
-// Sin Lombok: 50+ líneas de boilerplate
-// Con Lombok:
-@Getter @Builder @NoArgsConstructor @AllArgsConstructor
-public class User { ... }
+<Tabs>
+<TabItem value="tree" label="Estructura Completa">
+
+```text
+cja-msa-sc-security/
+├── build.gradle.kts                    # Dependencias y motor de compilación
+└── src/main/java/cja/msa/sc/security/
+    ├── domain/                         # 💜 NÚCLEO (Cero Frameworks)
+    │   ├── model/                      # Entidades (User) y Enums
+    │   └── exception/                  # Excepciones puras de negocio
+    │
+    ├── application/                    # 💙 ORQUESTACIÓN (Hexágono)
+    │   ├── port/in/                    # Contratos de Entrada (Casos de uso)
+    │   ├── port/out/                   # Contratos de Salida (Repositorios)
+    │   └── service/                    # Implementación de Casos de uso
+    │
+    └── infrastructure/                 # 🤎 ADAPTADORES (Framework / DB)
+        └── adapters/
+            ├── in/rest/                # Endpoints (UserResource, DTOs, Mappers)
+            └── out/persistence/        # BD real o Mocks (InMemoryUserRepository)
 ```
-**Annotations usadas:**
-- `@Getter` → genera todos los getters
-- `@Builder` → patrón builder fluido
-- `@NoArgsConstructor` / `@AllArgsConstructor` → constructores
 
-### MapStruct
-MapStruct genera implementaciones de mappers entre objetos en tiempo de compilación.
-```java
-// MapStruct genera automáticamente esta implementación:
-@Mapper(componentModel = "cdi")
-public interface UserMapper {
-    UserResponseDto toResponseDto(User user);
-}
-```
-**Ventajas sobre reflexión (ModelMapper):**
-- 10-100x más rápido (código generado, no reflexión)
-- Errores detectados en compilación
-- Compatible con Lombok (requiere `lombok-mapstruct-binding`)
+</TabItem>
+<TabItem value="domain" label="Domain (El Núcleo)">
 
-### SmallRye Health
-Implementa el estándar MicroProfile Health para Kubernetes:
-- `GET /q/health` — Estado general
-- `GET /q/health/live` — Liveness probe
-- `GET /q/health/ready` — Readiness probe
+**El Corazón (Cero Frameworks)**
+- **Qué hay:** Entidades (`User.java`), Value Objects, Enums, Excepciones puras.
+- **Regla Inquebrantable:** Esta capa **nunca** importa utilidades ajenas o anotaciones de infra como `jakarta.*` o `io.quarkus.*`. Si Quarkus se destruye mañana, tu dominio sigue siendo 100% válido y funcional en cualquier software estándar de Java.
 
----
+</TabItem>
+<TabItem value="app" label="Application (Orquestador)">
 
-## 7. Endpoints Implementados
+**Las Reglas de Movimiento**
+- **Qué hay:** Los Puertos (Las Interfaces `In` y `Out`) y los Servicios Concretos (`UserQueryService.java`).
+- **Comportamiento:** Orquesta inteligentemente el flujo. Recibe mandos lógicos del Exterior a través de los Puertos IN, orquesta las piezas del Dominio puro, y exige u obtiene datos a la Infraestructura ajena a través de los Puertos OUT.
 
-| Método | Ruta                    | Descripción                              | Respuesta exitosa |
-|--------|-------------------------|------------------------------------------|-------------------|
-| `GET`  | `/health`               | Estado del microservicio                 | 200 OK            |
-| `GET`  | `/api/v1/users`         | Lista todos los usuarios (mock)          | 200 OK            |
-| `GET`  | `/api/v1/users/{id}`    | Obtiene un usuario por ID                | 200 OK / 404      |
-| `POST` | `/api/v1/users`         | Crea un usuario nuevo (sin validación)   | 201 Created       |
+</TabItem>
+<TabItem value="infra" label="Infrastructure (Adaptadores)">
+
+**El Código Contaminado**
+- **Qué hay:** Quarkus, Annotations, Bibliotecas RESTEasy, Panache, DTOs (`UserResponseDto.java`), Mappers (`UserRestMapper.java`) y los Repositorios reales que tocan el disco o red.
+- **Comportamiento:** Su única labor es traducir las groseras peticiones REST HTTP o mensajes de Kafka en llamadas limpias y tipadas hacia los Puertos In; y paralelamente, implementar las interfaces de los Puertos Out para cumplir las exigencias de almacenamiento o consulta de la capa Application.
+
+</TabItem>
+</Tabs>
 
 ---
 
-## 8. Instrucciones para Ejecutar el Proyecto
+## 4. Operación: Endpoints y Pruebas Reales
 
-### Levantar en modo desarrollo (recomendado)
+Nuestro microservicio cobrará vida exponiendo operaciones puras a través de sus adaptadores REST (Endpoints Entrada).
+
+### API Contract
+
+| Método | Ruta | Propósito | HTTP Status |
+|---|---|---|---|
+| `GET` | `/health` | Kubernetes Liveness & Readiness Probes | `200 OK` |
+| `GET` | `/api/v1/users` | Listado general de usuarios controlados | `200 OK` |
+| `GET` | `/api/v1/users/{id}` | Búsqueda perimetral de un usuario específico | `200 OK` / `404 Not Found` |
+| `POST` | `/api/v1/users` | Transacción de registro de una entidad | `201 Created` |
+
+### Lanzamiento Local y Pruebas Automáticas
+
+La experiencia de desarrollador (Developer Experience DX) de Quarkus incluye *Live Reloading* instantáneo por defecto.
+
+<Tabs>
+<TabItem value="run" label="1. Levantar Quarkus (Dev Mode)">
+
+Inicia el entorno interactivo de desarrollo directamente desde tu terminal en la raíz del proyecto. Cualquier cambio detectado re-compilará los deltas en fracción de segundo sin tener que matar el proceso físico de tu terminal.
+
 ```bash
-# Windows PowerShell (desde la raíz del proyecto)
+# Windows PowerShell
 .\gradlew.bat quarkusDev
 
-# Linux / macOS
+# Entornos Linux / macOS
 ./gradlew quarkusDev
 ```
+*Tip: Puedes acceder a la interfaz de telemetría de desarrollo gráfica del motor en `http://localhost:8080/q/dev`*
 
-Quarkus Dev Mode incluye:
-- **Live Reload**: los cambios en código se aplican al instante sin reiniciar
-- **Dev UI**: interfaz web en `http://localhost:8080/q/dev`
-- **Swagger UI**: documentación de la API en `http://localhost:8080/swagger-ui`
+</TabItem>
+<TabItem value="test" label="2. Disparar Peticiones (cURL)">
 
-### Compilar (sin ejecutar)
-```bash
-.\gradlew.bat build
-```
-
----
-
-## 9. Cómo Probar los Endpoints
-
-### Usando cURL
+Con el motor dev en marcha, abre una pestaña contigua en tu terminal y dispara el contrato:
 
 ```bash
-# Health Check
+# 1. Revisar Salud Instante (Health Check)
 curl -X GET http://localhost:8080/health
 
-# Listar Usuarios
-curl -X GET http://localhost:8080/api/v1/users
-
-# Obtener Usuario por ID
-curl -X GET http://localhost:8080/api/v1/users/usr-001
-
-# Crear un Usuario
+# 2. Emular Creación de Usuario vía JSON
 curl -X POST http://localhost:8080/api/v1/users \
      -H "Content-Type: application/json" \
-     -d '{"username":"nuevoUsuario","email":"nuevo@test.com","password":"mypassword123","fullName":"Nuevo Estudiante"}'
+     -d '{"username":"nuevo","email":"test@test.com","password":"123","fullName":"Estudiante Alpha"}'
+
+# 3. Listar Colectivo Base
+curl -X GET http://localhost:8080/api/v1/users
+
+# 4. Extracción Unitaria
+curl -X GET http://localhost:8080/api/v1/users/usr-001
 ```
 
----
-
-## 10. Decisiones Técnicas
-
-### ¿Por qué Quarkus sobre Spring Boot?
-- Arranque en < 500ms vs 3-5s de Spring Boot
-- Consumo de memoria 40-60% menor
-- Compatible con GraalVM Native Image para despliegues ultra-ligeros
-- Diseñado desde el inicio para Kubernetes y cloud-native
-
-### ¿Por qué Hexagonal Architecture?
-- **Testabilidad:** el dominio se puede probar sin levantar HTTP ni base de datos
-- **Evolución:** cambiar de in-memory a PostgreSQL no toca el dominio ni la aplicación
-- **Claridad:** cada capa tiene una única responsabilidad bien definida
-- **Fintech:** facilita el cumplimiento regulatorio (trazabilidad, auditoría por capas)
-
-### ¿Por qué MapStruct sobre ModelMapper?
-- MapStruct genera código en compilación → detección temprana de errores
-- 10-100x más rápido en tiempo de ejecución (sin reflexión)
-- Explícito: solo mapea lo que defines, más seguro en contextos fintech
-
----
+</TabItem>
+</Tabs>

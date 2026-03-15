@@ -4,7 +4,7 @@ info:
   description: "API de seguridad, gestión de usuarios, login y MFA."
   version: 1.0.0
 servers:
-  - url: http://localhost:8081
+  - url: http://localhost:8080
     description: Servidor de Desarrollo Local
 paths:
   /api/v1/auth/login:
@@ -18,30 +18,38 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - username
-                - password
-              properties:
-                username:
-                  type: string
-                  example: "xgarnica"
-                password:
-                  type: string
-                  example: "password123"
+              $ref: '#/components/schemas/LoginRequest'
       responses:
-        '200':
-          description: "Login exitoso o requiere MFA"
+        "200":
+          description: "Login exitoso o confirmación de requerimiento MFA"
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  username:
-                    type: string
-                  mfaRequired:
-                    type: boolean
-                  accessToken:
-                    type: string
-        '401':
+                $ref: '#/components/schemas/LoginResponse'
+        "401":
           description: "Credenciales inválidas"
+components:
+  schemas:
+    LoginRequest:
+      description: "Payload para iniciar sesión"
+      type: object
+      required:
+        - password
+        - username
+      properties:
+        username:
+          description: "El nombre de usuario o email"
+          type: string
+          example: "user"
+        password:
+          description: "Contraseña en texto plano"
+          minLength: 8
+          type: string
+          example: "password123"
+    LoginResponse:
+      type: object
+      properties:
+        username:
+          type: string
+        accessToken:
+          type: string

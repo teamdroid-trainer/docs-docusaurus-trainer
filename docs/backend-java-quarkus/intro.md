@@ -5,61 +5,83 @@ description: Backend Java con Quarkus — Plataforma documental del curso para i
 sidebar_position: 1
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Backend Java con Quarkus
 
-Bienvenido a la plataforma de documentación del curso **Backend Java con Quarkus**, diseñado para instituciones financieras que buscan construir microservicios modernos, seguros y resilientes.
+:::info Propósito del Curso
+Este curso ha sido diseñado para transformar ingenieros de software en expertos de **arquitecturas modernas de grado financiero**, utilizando el stack más avanzado de Java y Quarkus.
+:::
 
-## ¿Qué aprenderás?
+## Arquitectura del Ecosistema
 
-Este curso cubre el ciclo completo de desarrollo de microservicios de nivel profesional, desde la estructura del proyecto hasta arquitecturas orientadas a eventos con autenticación multifactor.
+Siguiendo el principio de **Visual First**, aquí se presenta el flujo de interacción de los componentes que construirás a lo largo de las sesiones:
 
-## Stack Tecnológico
+```mermaid
+graph TD
+    User([Usuario/Cliente]) --> Gateway[API Gateway / Security Service]
+    
+    subgraph "Seguridad & Identidad"
+        Gateway --> Keycloak[(Keycloak OIDC)]
+        Gateway --> Redis[(Redis Cache)]
+    end
+    
+    subgraph "Dominio Reactivo"
+        Gateway -- "Event Bus" --> Audit[Microservicio de Auditoría]
+        Audit --> Postgres[(PostgreSQL)]
+    end
+    
+    style Gateway fill:#f9f,stroke:#333,stroke-width:2px
+    style Audit fill:#bbf,stroke:#333,stroke-width:2px
+```
 
-| Herramienta | Versión | Rol |
-|---|---|---|
-| **Java** | 21 / 25 (EA) | Lenguaje principal |
-| **Quarkus** | 3.x | Framework de microservicios cloud-native |
-| **Gradle** | 8.x (Kotlin DSL) | Build tool |
-| **Keycloak** | 24+ | Autenticación y autorización (OIDC) |
-| **PostgreSQL** | 15+ | Persistencia relacional |
-| **Redis** | 7+ | Caché en memoria |
-| **Docker** | 24+ | Contenedores locales |
-| **Lombok** | 1.18.x | Reducción de boilerplate |
-| **MapStruct** | 1.5+ | Mapeo entre capas |
-| **Mutiny** | — (Quarkus) | Programación reactiva |
+## ¿Por qué Quarkus y Arquitectura Hexagonal?
 
-## Estructura del Curso
+:::tip Insight Arquitectónico
+La robustez de un sistema financiero no reside solo en su código, sino en la **separación clara de responsabilidades**.
+:::
 
-| Sesión | Tema Principal | Microservicio(s) |
-|---|---|---|
-| [Sesión 1](./fundamentos/especificacion-tecnica) | Arquitectura Hexagonal y estructura del proyecto | `cja-msa-sc-security` |
-| [Sesión 2](./seguridad/validacion-openapi-seguridad) | Validación, OpenAPI y Seguridad con Keycloak | `cja-msa-sc-security` |
-| [Sesión 3](./auditoria/microservicio-auditoria) | Microservicio de Auditoría Reactivo | `cja-msa-sc-audit` |
-| [Sesión 4](./persistencia-cache/persistencia-cqrs-postgres) | Persistencia CQRS con PostgreSQL y Redis | `cja-msa-sc-audit` + `security` |
-| [Sesión 5](./resiliencia/fault-tolerance) | Resiliencia y Tolerancia a Fallos | `cja-msa-sc-security` |
-| [Sesión 6](./event-driven-mfa/event-bus-mfa) | Arquitectura Orientada a Eventos y MFA | `cja-msa-sc-security` |
+- **Quarkus**: Eficiencia sin precedentes con tiempos de arranque casi instantáneos y bajo consumo de memoria (Cloud Native).
+- **Hexagonal**: Protege tu lógica de negocio de cambios tecnológicos en la infraestructura.
 
-## Prerrequisitos
+## Stack Tecnológico Maestro
 
-- JDK 21 LTS (o JDK 25 EA)
-- Gradle 8.x
-- Docker Desktop
-- IntelliJ IDEA o VS Code con extensión Java
+| Herramienta | Rol Crítico |
+| :--- | :--- |
+| **Java 21/25** | Lenguaje de vanguardia con Virtual Threads. |
+| **Quarkus 3.x** | El framework Java más rápido para la nube. |
+| **Mutiny** | Programación reactiva simplificada. |
+| **Keycloak** | Estándar de seguridad OIDC para servicios financieros. |
+| **Redis & Postgres** | El balance perfecto entre velocidad y persistencia. |
 
-## Microservicios del Curso
+## Mapa de Ruta (Roadmap)
 
-### `cja-msa-sc-security`
-Microservicio principal de seguridad. Gestiona autenticación, autorización, caché de tokens y flujo MFA.
+<Tabs>
+  <TabItem value="fundamentos" label="Fase 1: Bases" default>
+    - **Sesión 1**: Arquitectura Hexagonal y Estructura.
+    - **Sesión 2**: OpenAPI y Seguridad con Keycloak.
+  </TabItem>
+  <TabItem value="reactivo" label="Fase 2: Reactividad">
+    - **Sesión 3**: Auditoría Reactiva con Mutiny.
+    - **Sesión 4**: Persistencia CQRS (Postgres + Redis).
+  </TabItem>
+  <TabItem value="avanzado" label="Fase 3: Resiliencia">
+    - **Sesión 5**: Fault Tolerance y Resiliencia.
+    - **Sesión 6**: Event-Driven MFA Workflow.
+  </TabItem>
+</Tabs>
 
-### `cja-msa-sc-audit`
-Microservicio de auditoría reactivo. Registra todos los eventos de seguridad de forma asíncrona.
+## Microservicios que Desarrollarás
 
-## Principios Aplicados
+### 🛡️ `cja-msa-sc-security`
+El cerebro del sistema. Orquestador de identidades, validación de tokens y flujos de autenticación multifactor.
 
-- **Hexagonal Architecture** (Ports & Adapters)
-- **Clean Architecture**
-- **Reactive Programming** con Mutiny
-- **Cloud-native** con Quarkus
-- **Security by design**
-- **Fault tolerance** con MicroProfile
-- **Event-Driven Architecture** (EDA)
+### 📝 `cja-msa-sc-audit`
+El sistema nervioso. Un servicio 100% no-bloqueante que captura y persiste cada rastro de actividad crítica.
+
+---
+
+:::warning Prerrequisitos
+Asegúrate de tener instalados **JDK 21+**, **Docker** y un IDE moderno (IntelliJ/VS Code) antes de comenzar la Sesión 1.
+:::

@@ -1,1 +1,1 @@
-{"responses":{"200":{"description":"Login exitoso o requiere MFA","content":{"application/json":{"schema":{"type":"object","properties":{"username":{"type":"string"},"mfaRequired":{"type":"boolean"},"accessToken":{"type":"string"}}}}}},"401":{"description":"Credenciales inválidas"}}}
+{"responses":{"200":{"description":"Login exitoso o confirmación de requerimiento MFA","content":{"application/json":{"schema":{"type":"object","properties":{"username":{"type":"string"},"accessToken":{"type":"string"}}}}}},"401":{"description":"Credenciales inválidas"}}}
