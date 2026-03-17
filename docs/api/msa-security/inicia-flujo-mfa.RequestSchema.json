@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","required":["username","password"],"properties":{"username":{"type":"string","examples":["admin"],"pattern":"\\S","description":"Nombre de usuario"},"password":{"type":"string","examples":["admin123"],"pattern":"\\S","description":"Contraseña"}},"title":"MfaStartRequestDto"}}},"required":true}}

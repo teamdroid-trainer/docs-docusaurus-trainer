@@ -1,0 +1,518 @@
+---
+id: security-microservice-api
+title: "Security Microservice API"
+description: "API segura para la gestión e identidades de los clientes."
+sidebar_label: Introduction
+sidebar_position: 0
+hide_title: true
+custom_edit_url: null
+---
+
+import ApiLogo from "@theme/ApiLogo";
+import Heading from "@theme/Heading";
+import SchemaTabs from "@theme/SchemaTabs";
+import TabItem from "@theme/TabItem";
+import Export from "@theme/ApiExplorer/Export";
+
+<span
+  className={"theme-doc-version-badge badge badge--secondary"}
+  children={"Version: 1.0.0"}
+>
+</span>
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Security Microservice API"}
+>
+</Heading>
+
+
+
+API segura para la gestión e identidades de los clientes.
+
+<div
+  style={{"marginBottom":"2rem"}}
+>
+  <Heading
+    id={"authentication"}
+    as={"h2"}
+    className={"openapi-tabs__heading"}
+    children={"Authentication"}
+  >
+  </Heading><SchemaTabs
+    className={"openapi-tabs__security-schemes"}
+  >
+    <TabItem
+      label={"OpenID Connect: SecurityScheme"}
+      value={"SecurityScheme"}
+    >
+      
+      
+      Authentication
+      
+      <div>
+        <table>
+          <tbody>
+            <tr>
+              <th>
+                Security Scheme Type:
+              </th><td>
+                openIdConnect
+              </td>
+            </tr><tr>
+              <th>
+                OpenID Connect URL:
+              </th><td>
+                http://localhost:8180/realms/quarkus/.well-known/openid-configuration
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </TabItem>
+  </SchemaTabs>
+</div>
+
+<Heading
+  id={"openapi-yaml"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+  children={"Especificación OpenAPI (YAML)"}
+>
+</Heading>
+
+```yaml
+---
+openapi: 3.1.0
+components:
+  schemas:
+    CreateUserRequest:
+      type: object
+      required:
+      - username
+      - email
+      - password
+      - fullName
+      description: Objeto JSON para crear un nuevo usuario con los parámetros obligatorios
+      properties:
+        username:
+          type: string
+          minLength: 5
+          examples:
+          - operator02
+          maxLength: 20
+          pattern: "^[a-zA-Z0-9_]+$"
+          description: Nombre de usuario (único)
+        email:
+          type: string
+          examples:
+          - operator02@institucion.com
+          pattern: \S
+          description: Correo electrónico institucional o personal
+        password:
+          type: string
+          minLength: 8
+          examples:
+          - P@ssw0rd123!
+          maxLength: 64
+          pattern: "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)[a-zA-Z\\d\\w\\W]{8,}$"
+          description: Contraseña de alta seguridad
+        fullName:
+          type: string
+          minLength: 3
+          examples:
+          - Juan Pérez
+          maxLength: 100
+          pattern: "^[a-zA-ZáéíóúÁÉÍÓÚñÑ\\s]+$"
+          description: Nombre completo del usuario
+    LocalDateTime:
+      type: string
+      format: date-time
+    LoginRequestDto:
+      type: object
+      required:
+      - username
+      - password
+      description: DTO para la petición de inicio de sesión
+      properties:
+        username:
+          type: string
+          examples:
+          - admin
+          pattern: \S
+          description: Nombre de usuario registrado
+        password:
+          type: string
+          examples:
+          - admin
+          pattern: \S
+          description: Contraseña en texto plano
+    LogoutRequestDto:
+      type: object
+      required:
+      - refreshToken
+      description: DTO para la petición de cierre de sesión
+      properties:
+        refreshToken:
+          type: string
+          examples:
+          - eyJhbGciOiJIUzI1NiIsInR5c... (refresh token)
+          pattern: \S
+          description: Token de refresco entregado durante el login
+    MfaStartRequestDto:
+      type: object
+      required:
+      - username
+      - password
+      properties:
+        username:
+          type: string
+          examples:
+          - admin
+          pattern: \S
+          description: Nombre de usuario
+        password:
+          type: string
+          examples:
+          - admin123
+          pattern: \S
+          description: Contraseña
+    MfaVerifyRequestDto:
+      type: object
+      required:
+      - challengeId
+      properties:
+        challengeId:
+          type: string
+          examples:
+          - mfa-7f8a9b
+          pattern: \S
+          description: ID del reto MFA
+        otpCode:
+          type: string
+          examples:
+          - "123456"
+          description: Código OTP recibido
+    TokenResponseDto:
+      type: object
+      description: Respuesta de Keycloak con los tokens emitidos
+      properties:
+        access_token:
+          type: string
+          examples:
+          - eyJhbG...
+          description: Token de acceso JWT corto para la API
+        expires_in:
+          type: integer
+          format: int64
+          examples:
+          - 300
+          description: Tiempo de vida del token de acceso en segundos
+        refresh_expires_in:
+          type: integer
+          format: int64
+          examples:
+          - 1800
+          description: Tiempo de vida del token de refresco en segundos
+        refresh_token:
+          type: string
+          examples:
+          - eyJhbG...
+          description: Token largo usado para obtener un nuevo access token
+        token_type:
+          type: string
+          examples:
+          - Bearer
+          description: Tipo de token emitido
+        not-before-policy:
+          type: integer
+          format: int32
+          examples:
+          - 0
+          description: Política de no-antes
+        session_state:
+          type: string
+          examples:
+          - d92751f0...
+          description: Identificador de la sesión activa en Keycloak
+        scope:
+          type: string
+          examples:
+          - email profile
+          description: Scopes concedidos al cliente
+    UserResponse:
+      type: object
+      description: "Respuesta que representa a un usuario, no incluye información\
+        \ sensible como contraseñas"
+      properties:
+        id:
+          type: string
+          examples:
+          - usr-005
+          description: Identificador único asignado automáticamente
+        username:
+          type: string
+          examples:
+          - usuario123
+          description: Username único
+        email:
+          type: string
+          examples:
+          - correo@ejemplo.com
+          description: Correo electrónico asociado
+        fullName:
+          type: string
+          examples:
+          - María Gómez
+          description: Nombre completo o de visualización
+        role:
+          $ref: "#/components/schemas/UserRole"
+          type: string
+          examples:
+          - OPERATOR
+          description: Rol asignado para control de acceso RBAC
+        status:
+          $ref: "#/components/schemas/UserStatus"
+          type: string
+          examples:
+          - ACTIVE
+          description: Estado actual de la cuenta del usuario
+        createdAt:
+          $ref: "#/components/schemas/LocalDateTime"
+          type: string
+          examples:
+          - 2025-01-15T10:30:00
+          description: Fecha de creación de la cuenta
+        lastLoginAt:
+          $ref: "#/components/schemas/LocalDateTime"
+          type: string
+          examples:
+          - 2025-01-16T12:00:00
+          description: Desconectado si es su primer ingreso
+        mfaEnabled:
+          type: boolean
+          examples:
+          - true
+          description: Indicador de Autenticación Multifactor
+    UserRole:
+      type: string
+      enum:
+      - ADMIN
+      - OPERATOR
+      - APPROVER
+      - CONSULTATION
+    UserStatus:
+      type: string
+      enum:
+      - ACTIVE
+      - INACTIVE
+      - LOCKED
+      - PENDING_VERIFICATION
+      - SUSPENDED
+  securitySchemes:
+    SecurityScheme:
+      type: openIdConnect
+      openIdConnectUrl: http://localhost:8180/realms/quarkus/.well-known/openid-configuration
+      description: Authentication
+paths:
+  /api/v1/auth/login:
+    post:
+      summary: Iniciar sesión
+      description: Autentica a un usuario y retorna los tokens de acceso usando el
+        flujo ROPC (Direct Access Grants)
+      tags:
+      - Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequestDto"
+        required: true
+      responses:
+        "200":
+          description: Login exitoso
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponseDto"
+        "401":
+          description: Credenciales inválidas
+        "400":
+          description: Bad Request
+  /api/v1/auth/logout:
+    post:
+      summary: Cerrar sesión
+      description: Invalida la sesión activa en Keycloak usando el token de refresco
+      tags:
+      - Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LogoutRequestDto"
+        required: true
+      responses:
+        "204":
+          description: Logout exitoso (Sin contenido)
+        "400":
+          description: Petición incorrecta o token faltante
+  /api/v1/auth/mfa/start:
+    post:
+      summary: Inicia flujo MFA
+      description: "Encadenamiento reactivo: credenciales -> políticas -> generar\
+        \ challenge -> auditar (pub/sub)"
+      tags:
+      - MFA Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MfaStartRequestDto"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json: {}
+        "400":
+          description: Bad Request
+  /api/v1/auth/mfa/verify:
+    post:
+      summary: Verifica OTP y completa Login
+      description: "Encadenamiento: cargar challenge (bloqueante) -> verificar OTP\
+        \ -> completar -> auditar"
+      tags:
+      - MFA Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MfaVerifyRequestDto"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json: {}
+        "400":
+          description: Bad Request
+  /api/v1/users:
+    get:
+      summary: Listar todos los usuarios
+      description: Retorna una colección JSON plana de todos los usuarios registrados
+        (Mock Session 1-2).
+      tags:
+      - Users Management
+      responses:
+        "200":
+          description: Lista devuelta de manera exitosa
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "401":
+          description: Token JWT no provisto o expirado
+        "403":
+          description: El usuario autenticado no posee permisos para consultar esta
+            data
+      security:
+      - SecurityScheme:
+        - ADMIN
+        - OPERATOR
+        - CONSULTATION
+    post:
+      summary: Dar de alta a un usuario
+      description: "Crea un usuario nuevo. Aplica reglas robustas de Bean Validation\
+        \ (Tamaños, Formatos) a la entrada."
+      tags:
+      - Users Management
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+        required: true
+      responses:
+        "201":
+          description: Usuario creado y devuelto de manera exitosa
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "400":
+          description: Falló la validación contra las reglas de completitud (Bad Request)
+        "401":
+          description: No Autorizado (JWT inválido)
+        "403":
+          description: Prohibido (Solo usuarios de ROL ADMIN pueden dar de alta a
+            otros usuarios)
+      security:
+      - SecurityScheme:
+        - ADMIN
+  /api/v1/users/{id}:
+    get:
+      summary: Obtener usuario por ID
+      description: Retorna la tupla pública de un usuario mediante su identificador
+        único String.
+      tags:
+      - Users Management
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Usuario encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "401":
+          description: No Autorizado (JWT inválido)
+        "403":
+          description: Prohibido (Roles insuficientes)
+        "404":
+          description: No se encontró el usuario en base de datos al ID proveído
+      security:
+      - SecurityScheme:
+        - ADMIN
+        - OPERATOR
+        - CONSULTATION
+  /health:
+    get:
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: {}
+      summary: Check Health
+      tags:
+      - Health Resource
+  /hello:
+    get:
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: string
+      summary: Hello
+      tags:
+      - Example Resource
+tags:
+- name: Auth
+  description: Operaciones de Autenticación (Facade ROPC a Keycloak)
+- name: MFA Auth
+  description: Flujo didáctico MFA mediante Eventos (Event Bus)
+- name: Users Management
+  description: "Endpoints para la gestión, altas y consultas de usuarios."
+info:
+  title: Security Microservice API
+  version: 1.0.0
+  description: API segura para la gestión e identidades de los clientes.
+```

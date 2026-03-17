@@ -83,6 +83,22 @@ const config: Config = {
               categoryLinkSource: "tag",
             },
           },
+          "msa-security": {
+            specPath: "docs/api/openapi-msa-security.yml",
+            outputDir: "docs/api/msa-security",
+            sidebarOptions: {
+              groupPathsBy: "tag",
+              categoryLinkSource: "tag",
+            },
+          },
+          "msa-audit": {
+            specPath: "docs/api/openapi-msa-audit.yml",
+            outputDir: "docs/api/msa-audit",
+            sidebarOptions: {
+              groupPathsBy: "tag",
+              categoryLinkSource: "tag",
+            },
+          },
         }
       },
     ],

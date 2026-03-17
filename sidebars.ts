@@ -1,5 +1,7 @@
 import type { SidebarsConfig } from '@docusaurus/plugin-content-docs';
 import apiSidebar from './docs/api-reference/sidebar';
+import msaSecuritySidebar from './docs/api/msa-security/sidebar';
+import msaAuditSidebar from './docs/api/msa-audit/sidebar';
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 
@@ -45,6 +47,26 @@ const sidebars: SidebarsConfig = {
         'backend-java-quarkus/fundamentos/gradle',
         'backend-java-quarkus/fundamentos/graalvm',
         'backend-java-quarkus/fundamentos/arquitectura-hexagonal',
+        {
+          type: 'category',
+          label: 'APIFirst Design',
+          link: {
+            type: 'doc',
+            id: 'backend-java-quarkus/fundamentos/api-first',
+          },
+          items: [
+            {
+              type: 'category',
+              label: 'Security API Spec',
+              items: msaSecuritySidebar,
+            },
+            {
+              type: 'category',
+              label: 'Audit API Spec',
+              items: msaAuditSidebar,
+            }
+          ],
+        },
         'backend-java-quarkus/fundamentos/especificacion-tecnica',
       ],
     },
