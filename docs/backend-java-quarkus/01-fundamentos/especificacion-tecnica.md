@@ -2,7 +2,7 @@
 id: especificacion-tecnica
 title: "Microservicio: Construcción y Especificación Técnica"
 description: "Base técnica del microservicio de seguridad: Hexagonal Architecture, Quarkus, Lombok y MapStruct"
-sidebar_position: 6
+sidebar_position: 7
 ---
 
 # Construcción del Microservicio: Especificación Técnica

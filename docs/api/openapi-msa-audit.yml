@@ -1,0 +1,143 @@
+---
+openapi: 3.1.0
+paths:
+  /api/v1/audit-logs:
+    get:
+      summary: Get Audit Logs
+      description: Retrieves audit logs filtered by criteria.
+      tags:
+      - Audit Log
+      parameters:
+      - description: Filter by end date (ISO-8601 format)
+        name: endDate
+        in: query
+        schema:
+          type: string
+      - description: Filter by functionality
+        name: functionality
+        in: query
+        schema:
+          type: string
+      - description: Filter by start date (ISO-8601 format)
+        name: startDate
+        in: query
+        schema:
+          type: string
+      - description: Filter by username
+        name: username
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: List of audit logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditLogResponseDto"
+    post:
+      summary: Create an Audit Log
+      description: Registers a new audit log event from external services.
+      tags:
+      - Audit Log
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAuditLogDto"
+        required: true
+      responses:
+        "201":
+          description: Audit log created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLogResponseDto"
+        "400":
+          description: Bad Request
+  /api/v1/audit-logs/stream-processing:
+    get:
+      summary: Async Stream Processing
+      description: A real-world async stream processing endpoint returning Server-Sent
+        Events by fetching Multi from DB.
+      tags:
+      - Audit Log
+      responses:
+        "200":
+          description: Stream processed successfully
+          content:
+            text/event-stream: {}
+  /hello:
+    get:
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: string
+      summary: Hello
+      tags:
+      - Example Resource
+tags:
+- name: Audit Log
+  description: Operations related to Audit Logs
+components:
+  schemas:
+    AuditLogResponseDto:
+      type: object
+      properties:
+        eventId:
+          $ref: "#/components/schemas/UUID"
+        functionality:
+          type: string
+        eventDate:
+          $ref: "#/components/schemas/LocalDateTime"
+        username:
+          type: string
+        eventType:
+          type: string
+        requestPayload:
+          type: string
+        responsePayload:
+          type: string
+        eventResult:
+          type: string
+        detail:
+          type: string
+        originService:
+          type: string
+    CreateAuditLogDto:
+      type: object
+      properties:
+        functionality:
+          type: string
+        username:
+          type: string
+        eventType:
+          type: string
+        requestPayload:
+          type: string
+        responsePayload:
+          type: string
+        eventResult:
+          type: string
+        detail:
+          type: string
+        originService:
+          type: string
+    LocalDateTime:
+      type: string
+      format: date-time
+      examples:
+      - 2022-03-10T12:15:50
+    UUID:
+      type: string
+      format: uuid
+      pattern: "[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}"
+info:
+  title: Audit Microservice API
+  version: 1.0.0
+  description: API segura para la gestión e inmutabilidad de los logs de auditoria.
