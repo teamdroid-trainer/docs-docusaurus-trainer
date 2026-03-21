@@ -137,6 +137,15 @@ const sidebars: SidebarsConfig = {
         'backend-java-quarkus/event-driven-mfa/event-bus-mfa',
       ],
     },
+    {
+      type: 'category',
+      label: 'Tema 7 - Kafka',
+      collapsed: true,
+      items: [
+        'backend-java-quarkus/kafka/01-kafka-teoria',
+        'backend-java-quarkus/kafka/02-kafka-quarkus-implementacion',
+      ],
+    },
 
   ],
 };
