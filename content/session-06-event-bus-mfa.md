@@ -19,6 +19,7 @@ Esta sesion introduce:
 - Se ajusta [`gradle.properties`](/C:/Users/XAVIER%20GARNICA/Desktop/ATOMKODE/TRAINER/BACKEND/cja-msa-sc-security/gradle.properties) sin impacto funcional relevante.
 
 ### Nuevos componentes funcionales
+- Nuevo servicio orquestador en [`MfaService.java`](/C:/Users/XAVIER%20GARNICA/Desktop/ATOMKODE/TRAINER/BACKEND/cja-msa-sc-security/src/main/java/cja/msa/sc/security/application/service/MfaService.java).
 - Nuevo resource REST MFA en [`MfaResource.java`](/C:/Users/XAVIER%20GARNICA/Desktop/ATOMKODE/TRAINER/BACKEND/cja-msa-sc-security/src/main/java/cja/msa/sc/security/infrastructure/adapters/in/rest/MfaResource.java).
 - Nuevo orquestador de eventos en [`MfaEventConsumers.java`](/C:/Users/XAVIER%20GARNICA/Desktop/ATOMKODE/TRAINER/BACKEND/cja-msa-sc-security/src/main/java/cja/msa/sc/security/application/service/MfaEventConsumers.java).
 - Nuevo modelo de contexto compartido en [`MfaEventContext.java`](/C:/Users/XAVIER%20GARNICA/Desktop/ATOMKODE/TRAINER/BACKEND/cja-msa-sc-security/src/main/java/cja/msa/sc/security/domain/model/MfaEventContext.java).
@@ -208,7 +209,8 @@ Conceptos clave:
 ```mermaid
 flowchart LR
     Client[Cliente HTTP] --> MfaResource[MfaResource]
-    MfaResource --> EB[(Quarkus Event Bus)]
+    MfaResource --> MfaService[MfaService]
+    MfaService --> EB[(Quarkus Event Bus)]
     EB --> C1[credentials.validate]
     EB --> C2[policy.evaluate]
     EB --> C3[otp.generate]
@@ -227,14 +229,16 @@ flowchart LR
     Client[Cliente] --> Start["POST /mfa/start"]
     Client --> Verify["POST /mfa/verify"]
 
-    Start --> EB1[(Event Bus)]
+    Start --> Svc1[MfaService]
+    Svc1 --> EB1[(Event Bus)]
     EB1 --> S1[credentials.validate]
     EB1 --> S2[policy.evaluate]
     EB1 --> S3[otp.generate]
     EB1 --> S4[challenge.generate]
     S4 --> Store[(challengeStore)]
 
-    Verify --> EB2[(Event Bus)]
+    Verify --> Svc2[MfaService]
+    Svc2 --> EB2[(Event Bus)]
     EB2 --> V1[challenge.load]
     V1 --> Store
     EB2 --> V2[otp.verify]
@@ -711,6 +715,7 @@ Response:
 sequenceDiagram
     participant C as Cliente
     participant R as MfaResource
+    participant Svc as MfaService
     participant EB as Event Bus
     participant V as credentials.validate
     participant P as policy.evaluate
@@ -719,7 +724,8 @@ sequenceDiagram
     participant S as challengeStore
 
     C->>R: POST /mfa/start
-    R->>EB: request(credentials.validate, context)
+    R->>Svc: executeStartFlow(context)
+    Svc->>EB: request(credentials.validate, context)
     EB->>V: context
     V->>V: authenticate(username, password)
     V-->>EB: context + token
@@ -730,7 +736,8 @@ sequenceDiagram
     EB->>G: context
     G->>S: guardar context por challengeId
     G-->>EB: context + challengeId
-    EB-->>R: context final
+    EB-->>Svc: context final
+    Svc-->>R: context final
     R-->>C: 200 + challengeId + PENDING_MFA
 ```
 
@@ -837,6 +844,7 @@ Idea clave:
 sequenceDiagram
     participant C as Cliente
     participant R as MfaResource
+    participant Svc as MfaService
     participant EB as Event Bus
     participant L as challenge.load
     participant V as otp.verify
@@ -844,7 +852,8 @@ sequenceDiagram
     participant S as challengeStore
 
     C->>R: POST /mfa/verify
-    R->>EB: request(challenge.load, context)
+    R->>Svc: executeVerifyFlow(context)
+    Svc->>EB: request(challenge.load, context)
     EB->>L: context(challengeId, otpCodeReceived)
     L->>S: leer context
     L-->>EB: context recuperado
@@ -852,8 +861,9 @@ sequenceDiagram
     V-->>EB: context validado
     EB->>F: context
     F->>S: eliminar challengeId
-    F-->>EB: TokenResponseDto
-    EB-->>R: token
+    F-->>EB: Token/Context
+    EB-->>Svc: Token/Context
+    Svc-->>R: token
     R-->>C: 200 + token final
 ```
 
@@ -1050,5 +1060,3 @@ La leccion importante es que el contrato por mensaje ya existe. Cambiar el trans
 - el contexto viaja entre consumers;
 - los errores deben entender el paso por Event Bus;
 - la sesion introduce bases reales para avanzar luego a patrones EDA distribuidos.
-
-AIzaSyBTisIjWIwBfXVaVpdPkedT8wRynFmRrIE

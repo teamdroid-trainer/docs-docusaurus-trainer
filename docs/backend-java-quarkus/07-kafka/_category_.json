@@ -1,0 +1,8 @@
+{
+  "label": "Tema 7 - Kafka",
+  "position": 7,
+  "link": {
+    "type": "generated-index",
+    "description": "Introducción y Arquitectura de Event Driven con Apache Kafka en Quarkus."
+  }
+}
