@@ -1,0 +1,8 @@
+{
+  "label": "Tema 8 - Testing",
+  "position": 8,
+  "link": {
+    "type": "generated-index",
+    "description": "Estrategias de pruebas (Unitarias e Integración) y medición de cobertura con JaCoCo en Quarkus."
+  }
+}

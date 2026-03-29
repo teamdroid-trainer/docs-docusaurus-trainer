@@ -146,6 +146,17 @@ const sidebars: SidebarsConfig = {
         'backend-java-quarkus/kafka/02-kafka-quarkus-implementacion',
       ],
     },
+    {
+      type: 'category',
+      label: 'Tema 8 - Testing',
+      collapsed: true,
+      items: [
+        'backend-java-quarkus/testing/tests-unitarios-java-quarkus',
+        'backend-java-quarkus/testing/tests-integracion-java-quarkus',
+        'backend-java-quarkus/testing/code-coverage-jacoco',
+        'backend-java-quarkus/testing/session-08-testing',
+      ],
+    },
 
   ],
 };

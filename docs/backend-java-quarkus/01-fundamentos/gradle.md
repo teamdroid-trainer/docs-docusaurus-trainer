@@ -66,37 +66,76 @@ flowchart LR
 
 ---
 
-## Implementación
+## Implementación: El Verdadero Contraste
 
-La diferencia principal con el modelo clásico es la capacidad de expresar configuraciones complejas con mínima verbosidad.
+La principal ventaja del modelo de Gradle con Kotlin no es solo estética, es una drástica reducción matemática de líneas, especialmente al lidiar con plataformas (BOMs), alcances (*scopes*) y exclusiones de librerías. Observa la diferencia manejando el **mismo** bloque lógico.
 
 <Tabs>
 <TabItem value="gradle" label="Gradle (Kotlin DSL)">
 
-El enfoque moderno, seguro y expresivo:
+El enfoque conciso y seguro con solo **12 líneas efectivas**.
 
 ```kotlin title="build.gradle.kts"
-plugins {
-    java
-}
-
 dependencies {
-    // Declaración concisa en una sola línea
-    implementation("io.quarkus:quarkus-resteasy:3.9.2")
+    // 1. Importación de Plataforma (BOM) en una sola línea
+    implementation(enforcedPlatform("io.quarkus.platform:quarkus-bom:3.9.2"))
+    
+    // 2. Dependencias tradicionales
+    implementation("io.quarkus:quarkus-resteasy-reactive")
+    
+    // 3. Exclusión de librerías en un bloque limpio
+    implementation("io.quarkus:quarkus-hibernate-orm") {
+        exclude(group = "org.jboss.logging")
+    }
+    
+    // 4. Scopes nativos declarativos
+    testImplementation("io.quarkus:quarkus-junit5")
 }
 ```
 
 </TabItem>
 <TabItem value="maven" label="Maven (XML)">
 
-El estándar histórico, rígido y verboso:
+El estándar heredado exige más de **30 líneas anidadas** para lograr matemáticamente **la misma construcción de dependencias**.
 
 ```xml title="pom.xml"
+<!-- 1. Importación de Plataforma (BOM) verborrágica -->
+<dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>io.quarkus.platform</groupId>
+            <artifactId>quarkus-bom</artifactId>
+            <version>3.9.2</version>
+            <type>pom</type>
+            <scope>import</scope>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
+
 <dependencies>
+    <!-- 2. Dependencias tradicionales -->
     <dependency>
         <groupId>io.quarkus</groupId>
-        <artifactId>quarkus-resteasy</artifactId>
-        <version>3.9.2</version>
+        <artifactId>quarkus-resteasy-reactive</artifactId>
+    </dependency>
+    
+    <!-- 3. Exclusión profundamente anidada -->
+    <dependency>
+        <groupId>io.quarkus</groupId>
+        <artifactId>quarkus-hibernate-orm</artifactId>
+        <exclusions>
+            <exclusion>
+                <groupId>org.jboss.logging</groupId>
+                <artifactId>*</artifactId>
+            </exclusion>
+        </exclusions>
+    </dependency>
+    
+    <!-- 4. Scopes declarados en propiedad hija -->
+    <dependency>
+        <groupId>io.quarkus</groupId>
+        <artifactId>quarkus-junit5</artifactId>
+        <scope>test</scope>
     </dependency>
 </dependencies>
 ```
@@ -134,6 +173,33 @@ dependencies {
     testImplementation("io.rest-assured:rest-assured")
 }
 ```
+
+---
+
+## Velocidad: ¿Es realmente más rápido que Maven?
+
+La respuesta es rotundamente **Sí**. El diseño estructural de Gradle Inc. está fundamentado en la evitación del trabajo redundante. Mientras que Maven ejecuta sus fases de construcción de manera imperativa y casi siempre lineal (compilando de cero), Gradle instrumenta gráficos acíclicos dirigidos (DAGs) para reutilizar inteligentemente los resultados ya obtenidos.
+
+<Tabs>
+<TabItem value="incremental" label="Compilación Incremental">
+
+### Modificación de un solo archivo
+Cuando modificas una clase de servicio o controlador, el motor de Gradle sabe exactamente a nivel de grafo qué componentes dependen de él, y recompila **únicamente esa fracción del árbol**.
+
+- **Maven:** Ejecuta fases estandarizadas que pueden tomar ~15 segundos en microservicios medios.
+- **Gradle:** Detecta estados `UP-TO-DATE` y completa la inyección en **~0.6 segundos** (hasta **85x veces más rápido** en el ciclo diario de código).
+
+</TabItem>
+<TabItem value="cache" label="Limpieza y Caché Global">
+
+### Cambio de Ramas (Clean Build)
+Si cambias a una rama de `git` antigua que un compañero (o tú mismo ayer) ya había compilado, el *Build Cache* de Gradle intercepta la tarea.
+
+- **Maven:** Destruye la carpeta `target/` y pierde minutos valiosos recompilando todo el código fuente al 100%.
+- **Gradle:** Descarga inmediatamente los *artifacts* ya pre-calculados de la caché local o concurrente, reduciendo tiempos de 1 minuto a apenas **~2 o 4 segundos** (típicamente de **3x a 10x más rápido**).
+
+</TabItem>
+</Tabs>
 
 ---
 
