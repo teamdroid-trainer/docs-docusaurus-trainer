@@ -134,17 +134,27 @@ try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
 ```
 
 </TabItem>
-<TabItem value="java25" label="Java 25 (LTS Futura)">
+<TabItem value="java25" label="Java 25 (Próxima LTS)">
 
-**La Próxima Frontera**
-- **Valhalla (Avance):** Tipos de valor para acercar el rendimiento de memoria al de C++ (sin punteros a objetos pequeños).
-- **Panama:** Nueva Foreign Function & Memory API (Reemplaza JNI, mil veces más rápida).
+**La Próxima Frontera de Eficiencia**
+La evolución hacia Java 25 se enfoca en exprimir el hardware actual al máximo y en limpiar por completo la sintaxis diaria del desarrollador:
 
-```java title="Tipos de Valor Cercanos al Metal (Proyección Valhalla)"
-// Concepto futuro: objetos compactos sin sobrecarga de identidad en memoria
-public value record Point(int x, int y) {}
+- **Variables Anónimas (Unnamed Variables `_`):** Permite ignorar variables obligatorias que el lenguaje te exige declarar pero que realmente no vas a usar (ej: excepciones capturadas genéricas), silenciando advertencias estáticas del IDE y limpiando la lectura.
+- **Tipos de Valor (Project Valhalla):** Objetos de Java que se comportarán en memoria exactamente como primitivos (`int`, `double`). Ahorran drásticamente la memoria RAM del servidor y eliminan los `NullPointerException` de raíz, ya que **no pueden ser nulos**.
 
-Point p1 = new Point(10, 20);
+```java title="Mejoras Prácticas y Rendimiento de Memoria"
+// 1. Variables Anónimas (Ignoramos la variable de la excepción con un guion bajo '_')
+try {
+    var id = Integer.parseInt("ABC");
+} catch (NumberFormatException _) {
+    System.out.println("Formato inválido, regresando valor por defecto.");
+}
+
+// 2. Project Valhalla (Proyección de Value Classes)
+// Un objeto ultraligero que jamás podrá ser 'null' y no satura el Garbage Collector genérico
+public value record PuntoGeografico(double lat, double lng) {}
+
+PuntoGeografico ubicacion = new PuntoGeografico(19.43, -99.13);
 ```
 
 </TabItem>
