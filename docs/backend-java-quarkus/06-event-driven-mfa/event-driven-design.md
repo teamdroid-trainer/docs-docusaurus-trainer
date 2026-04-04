@@ -7,180 +7,285 @@ sidebar_position: 1
 
 # Event-Driven Design con Quarkus y Event Bus
 
-Antes de construir el flujo MFA con eventos, necesitamos entender el **cambio de mentalidad** que hace a un sistema orientado a eventos algo fundamentalmente diferente a un sistema basado en llamadas directas. Esta sección sienta las bases teóricas y prácticas para todo lo que viene después.
+Antes de construir flujos distribuidos completos, necesitamos entender el **cambio de mentalidad** que hace a un sistema orientado a eventos algo fundamentalmente diferente a un sistema basado en llamadas directas.
 
-:::info Fundamento del Tema 6
-Esta sección es la base conceptual. El flujo MFA que verás en la sección siguiente solamente tiene sentido si entiendes primero **por qué** modelamos cada paso como un evento.
+:::info Fundamento Conceptual
+El enfoque orientado a eventos transforma nuestra arquitectura en un modelo puramente reactivo y desacoplado. Para aprovechar estas capacidades en Quarkus, es esencial comprender **por qué** modelamos los procesos como eventos independientes y cómo esto nos proporciona ventajas empresariales únicas.
 :::
 
 ---
 
-## 1. Radiografía Visual: Cómo Cambia el Sistema
+## 1. El Glosario Reactivo: Conceptos Fundamentales
 
-La diferencia entre ambos modelos no es tecnológica: es una diferencia de **perspectiva arquitectónica**.
-
-```mermaid
-graph LR
-    subgraph Tradicional ["Modelo Tradicional - Cadena de Llamadas"]
-        A1[Resource] --> B1[Service A]
-        B1 --> C1[Service B]
-        C1 --> D1[Service C]
-    end
-
-    subgraph Eventos ["Modelo EDA - Cadena de Hechos"]
-        A2[Resource] --> EB[(Event Bus)]
-        EB --> B2[credentials.validate]
-        EB --> C2[policy.evaluate]
-        EB --> D2[otp.generate]
-    end
-```
-
-| Dimensión | Modelo Tradicional | Modelo EDA |
-|:---|:---|:---|
-| **Contrato** | Llamada a método | Mensaje hacia una dirección |
-| **Acoplamiento** | Fuerte — cada paso conoce al siguiente | Débil — el emisor conoce la dirección, no la implementación |
-| **Extensibilidad** | Cambiar un paso puede romper los demás | Se añaden consumers sin tocar el productor |
-| **Trazabilidad** | Difícil de auditar paso a paso | Cada evento es un hecho registrable |
-
----
-
-## 2. Los Tres Conceptos Clave
+Antes de entrar en las analogías, definamos las 4 piezas de Lego con las que se construye cualquier sistema orientado a eventos:
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 <Tabs>
-<TabItem value="event" label="1. ¿Qué es un Evento?">
+<TabItem value="evento" label="Evento">
 
-Un evento es un **mensaje que representa un hecho o una transición relevante** en el sistema. No es una orden; es una notificación de que algo ocurrió o algo debe continuar.
-
-```mermaid
-flowchart LR
-    P[Productor] -->|"CredentialsValidated"| EB[(Bus / Canal)]
-    EB --> C1[Consumer A — genera OTP]
-    EB --> C2[Consumer B — audita el intento]
-```
-
-La clave está en el **nombre del evento**: usa lenguaje del negocio, no de la tecnología.
-
-| Mal nombre | Buen nombre |
-|:---|:---|
-| `callValidateService()` | `credentials.validate` |
-| `sendHttpPost()` | `audit.log` |
-| `executeStep3()` | `otp.generate` |
+**¿Qué es?**
+Un evento es un **mensaje que representa un dato, contexto o suceso importante**. Su propósito principal es encapsular información (payload) y viajar por el sistema para ser capturado por cualquier componente interesado, operando como un estímulo para desencadenar otras tareas.
 
 </TabItem>
-<TabItem value="eda" label="2. ¿Qué es EDA?">
+<TabItem value="bus" label="Event Bus">
 
-**EDA (Event-Driven Architecture)** es un estilo de diseño donde:
-- Un **productor** emite un mensaje describiendo algo que ocurrió.
-- Un **canal** (bus, broker) transporta el mensaje.
-- Uno o varios **consumidores** reaccionan al mensaje de forma independiente.
+**¿Qué es?**
+El Event Bus (o Bus de Eventos) es la **autopista central** de comunicación. 
+Es el intermediario que recibe los eventos de un remitente y se encarga de entregárselos a quien (o quienes) estén interesados en escucharlo, logrando que los componentes no necesiten conocerse entre sí.
+
+</TabItem>
+<TabItem value="address" label="Address">
+
+**¿Qué es?**
+El término "Address" (o Dirección) es como un **canal de radio o un hashtag**. 
+Cuando alguien publica un evento, no lo envía a una persona específica, lo publica en una `address`. Cualquiera que se suscriba a esa `address` recibirá el mensaje. Ejemplo: `address = "orden.tomada"`.
+
+</TabItem>
+<TabItem value="consumer" label="Consumer">
+
+**¿Qué es?**
+El Consumer (Consumidor o Listener) es la **pieza de código que está escuchando** pacientemente una `address` específica. En el momento en que un evento pasa por esa dirección, el Event Bus despierta al Consumer y le entrega el mensaje para que reaccione.
+
+</TabItem>
+</Tabs>
+
+### Arquitectura Conceptual
+La interacción de todas estas piezas se resume visualmente en este ecosistema:
 
 ```mermaid
 flowchart LR
-    P[Productor] --> M[Mensaje]
-    M --> C[Canal / Bus]
-    C --> X[Consumidor A]
-    C --> Y[Consumidor B]
-    C --> Z[Consumidor N]
+    P[Productor] -->|Publica un 'Evento'| EB[(Event Bus)]
+    EB -->|Usa un 'Address' específico| C1[Consumer 1]
+    EB -->|Usa un 'Address' específico| C2[Consumer 2]
 ```
 
-:::tip ¿Cuándo usar EDA?
-EDA aporta más valor cuando una operación no es una sola acción, sino una **cadena de verificaciones, decisiones y efectos**:
-- Autenticación multifactor
-- Validación de transferencias bancarias
-- Conciliación de movimientos contables
-- Detección de fraude en tiempo real
+---
+
+## 2. La Analogía del Restaurante: ¿Por qué EDA?
+
+Imagina un restaurante de comida rápida. Analicémoslo bajo dos enfoques:
+
+**Modelo Tradicional (Síncrono)**
+Llegas a la caja de pedidos y pides un combo. El cajero anota tu orden, se voltea, va a la estación de carne y prepara la hamburguesa. Luego va a la máquina de sodas y sirve la bebida. Vuelve a la caja y te entrega el pedido. Mientras tanto, la fila detrás de ti está bloqueada. El cajero, el cocinero y el despachador de bebidas están **fuertemente acoplados**. Si se rompe la máquina de sodas, todo el proceso lanza un error y te devuelven el dinero.
+
+**Modelo Orientado a Eventos (EDA)**
+Llegas a la caja de pedidos. El cajero toma el pago, te da un **localizador (pager)** y emite al intercomunicador (Event Bus): *"¡`orden.tomada`!"*.
+Inmediatamente, él puede seguir atendiendo a la siguiente persona en la fila.
+Por detrás, las estaciones (Consumidores) escuchan hechos (eventos) y reaccionan de manera independiente:
+1. La estación de parrilla escucha `orden.tomada` y al terminar emite `hamburguesa.preparada`.
+2. La estación de bebidas escucha que la parrilla terminó (`hamburguesa.preparada`) y emite `bebida.servida`.
+3. El despachador escucha que ambas cosas están listas (`bebida.servida`), y hace sonar tu localizador (`orden.entregada`).
+
+```mermaid
+graph LR
+    subgraph Tradicional ["Modelo Tradicional (Bloqueante)"]
+        C1[Cajero] -->|Hace todo y bloquea fila| K1[Prepara Comida]
+        K1 -->|Entrega y libera fila| C1
+    end
+
+    subgraph Eventos ["Modelo EDA (Reactivo / Localizador)"]
+        C2[Cajero] -->|Emite Evento: 'orden.tomada'| B[(Event Bus / Intercomunicador)]
+        B --> K2[Estación Parrilla]
+        B --> P[Estación Bebidas]
+        K2 -->|Emite: 'hamburguesa.preparada'| B
+        P -->|Emite: 'bebida.servida'| B
+    end
+```
+
+---
+
+## 3. Radiografía Visual: Sistema Tradicional vs EDA
+
+Veamos cómo se traduce exactamente esta analogía en diagramas de secuencia arquitectónicos.
+
+### Flujo Tradicional (Cadena de Llamadas)
+Cada componente llama directamente al siguiente. El orquestador o la caja original tiene la responsabilidad de conocer y mandar a llamar a cada servicio.
+
+```mermaid
+sequenceDiagram
+    participant API as Cajero Resource
+    participant Food as Servicio Comida
+    participant Drink as Servicio Bebida
+    participant Disp as Servicio Despacho
+
+    API->>Food: 1. preparar(hamburguesa)
+    Food->>Drink: 2. servir(soda)
+    Drink->>Disp: 3. despachar(pager)
+    Disp-->>API: 4. respuesta final (Síncrona)
+```
+
+### Flujo EDA (Cadena de Eventos/Hechos)
+El Cajero Resource no conoce a cuáles estaciones llamar. Solo publica el Evento al Bus. El bus transmite los mensajes a los despachadores correctos según qué evento ha sucedido.
+
+```mermaid
+sequenceDiagram
+    participant API as Cajero Resource
+    participant EB as Quarkus Event Bus
+    participant C1 as Consumer: Comida
+    participant C2 as Consumer: Bebidas
+    participant C3 as Consumer: Despacho
+
+    API->>EB: eventBus.request("orden.tomada", ctx)
+    EB->>C1: Transmite Evento
+    C1-->>EB: Responde Hecho (hamburguesa.preparada)
+    
+    API->>EB: eventBus.request("hamburguesa.preparada", ctx)
+    EB->>C2: Transmite Evento
+    C2-->>EB: Responde Hecho (bebida.servida)
+
+    API->>EB: eventBus.request("bebida.servida", ctx)
+    EB->>C3: Transmite Evento
+    C3-->>EB: Responde Hecho (orden.entregada)
+```
+
+:::tip Desacoplamiento Real
+En el modelo EDA, el Cajero conoce el "intercomunicador", pero no tiene ni idea de cuántos cocineros hay atrás, en qué estufa cocinan ni qué tecnología usan.
+:::
+
+---
+
+## 4. Ventajas Avanzadas de EDA
+
+El diseño orientado a eventos nos otorga características que un sistema síncrono no puede igualar fácilmente en esta misma analogía.
+
+<Tabs>
+<TabItem value="context" label="1. Almacenamiento de Contextos (DB)">
+
+En un flujo síncrono tradicional, si el proceso se cae a la mitad (ej: se acaba el gas de la parrilla), el usuario recibe un Error 500 y tiene que volver a formar toda la fila. El estado desaparece.
+
+En EDA, dado que cada transición de la orden es un "objeto u orden de contexto" (Ej: `OrderContext`), podemos **guardar el estado acumulativo en una base de datos** tras cada paso procesado exitosamente por cualquier consumidor.
+
+```mermaid
+sequenceDiagram
+    participant EB as Event Bus
+    participant C1 as Consumer: Comida
+    participant BD as Base de Datos
+    participant C2 as Consumer: Bebidas
+
+    EB->>C1: recibe: orden.tomada
+    C1->>BD: persiste( Context: {food=ready} )
+    C1-->>EB: emite: hamburguesa.preparada
+
+    EB->>C2: recibe: hamburguesa.preparada
+    C2->>BD: persiste( Context: {drink=ready} )
+    C2-->>EB: emite: bebida.servida
+```
+
+```java
+@ConsumeEvent("hamburguesa.preparada")
+public OrderContext registrarPaso(OrderContext ctx) {
+    ctx.setFoodReady(true);
+    // Guardamos que la comida ya está lista, por si se va la luz
+    orderRepository.persist(ctx);
+    return ctx;
+}
+```
+
+</TabItem>
+<TabItem value="replay" label="2. Replay y Reproducción de Flujos">
+
+Al persistir los eventos en DB, logramos una característica fundamental: **reproducir (replay)** flujos exactos. 
+
+Si el paso 3 (`bebida.servida`) falla porque se trabó la máquina de hielos, no le obligamos al cliente a formarse y pagar de nuevo. Simplemente tomamos su `OrderContext` guardado (que ya tiene la comida lista), destrabamos la máquina y **reinyectamos el evento** directo al bus, reanudando todo en `hamburguesa.preparada`.
+
+```mermaid
+sequenceDiagram
+    participant BD as Base de Datos
+    participant Admin as Job / Admin
+    participant EB as Event Bus
+    participant C2 as Consumer: Bebidas
+    
+    Admin->>BD: 1. Consulta órdenes atoradas
+    BD-->>Admin: Retorna Contexto {food=ready}
+    Admin->>EB: 2. Reinyecta evento: hamburguesa.preparada
+    EB->>C2: Transmite evento
+    C2-->>EB: 3. Flujo continúa: bebida.servida
+```
+
+:::info Casos de Uso Reales
+- **Retry Patterns:** Reintentos automáticos tras fallos transitorios.
+- **Forense Técnico:** Reproducir una traza de eventos de una TX fallida en ambiente de pruebas para observar el error exacto.
 :::
 
 </TabItem>
-<TabItem value="patterns" label="3. Patrones de Comunicación">
+<TabItem value="dynamic" label="3. Dinamismo y Rutas a Medida">
 
-**Request/Reply** — El emisor espera una respuesta del consumer:
+Al ser independiente cada paso, la orquestación puede ser **dinámica**. 
+
+Podemos consultar si la máquina de bebidas se descompuso y simplemente saltarnos la estación de bebidas dinámicamente, enviando el trayecto directo al despacho en runtime, sin alterar código.
+
 ```mermaid
-sequenceDiagram
-    participant R as Resource
-    participant EB as Event Bus
-    participant C as Consumer
-    R->>EB: request(address, payload)
-    EB->>C: mensaje
-    C-->>EB: respuesta
-    EB-->>R: reply
+flowchart LR
+    BD[(Reglas en BD)] -->|Define Ruta: 1, 3| O[Orquestador Principal]
+    O -->|Paso 1| C1[Comida]
+    O -.->|X Paso Desactivado| C2[Bebidas]
+    O -->|Paso 3| C3[Despacho]
 ```
 
-**Publish/Subscribe** — El emisor difunde sin esperar respuesta (múltiples consumers en paralelo):
-```mermaid
-sequenceDiagram
-    participant P as Productor
-    participant EB as Event Bus
-    participant A as Subscriptor A
-    participant B as Subscriptor B
-    P->>EB: publish(evento)
-    EB-->>A: copia del evento
-    EB-->>B: copia del evento
-```
+```java title="Pipeline Dinámico"
+// El Cajero sabe qué pedir según la orden de DB, y no por código Hardcodeado
+List<String> estacionesActivas = inventoryService.getEstacionesActivas();
+// estaciones = ["orden.tomada", "hamburguesa.preparada"] (sin pasar por bebidas)
 
-**En esta sesión**: usamos **Request/Reply** con `eventBus.request(...)` para encadenar el flujo MFA de forma reactiva y controlada.
+OrderContext ctx = new OrderContext(request);
+
+for (String paso : estacionesActivas) {
+    // Si la máquina de bebidas está caída, el evento se brincará ese paso
+    ctx = eventBus.request(paso, ctx).await().indefinitely().body();
+}
+```
 
 </TabItem>
 </Tabs>
 
 ---
 
-## 3. El Quarkus Event Bus
+## 5. El Quarkus Event Bus: Implementación Práctica
 
-Quarkus expone el **Vert.x Event Bus** con una API limpia y compatible con el modelo reactivo de `Mutiny`.
+Para aplicar esta arquitectura, utilizamos la API de **Vert.x Event Bus** proporcionada por Quarkus.
 
-```mermaid
-flowchart LR
-    R[Resource] -->|"eventBus.request(address, ctx)"| EB[(Quarkus Event Bus)]
-    EB -->|"@ConsumeEvent"| C1["Consumer 1<br/>address: credentials.validate"]
-    EB -->|"@ConsumeEvent"| C2["Consumer 2<br/>address: policy.evaluate"]
-    C1 -->|"Uni reply"| EB
-    EB -->|"siguiente paso"| C2
-```
+### El Productor (Event Source)
+El Cajero genera el evento inicial utilizando **Request/Reply**, esperando la confirmación de forma no bloqueante usando Mutiny (`Uni`).
 
-### API Fundamental
+```java title="CajeroResource.java"
+@Inject 
+EventBus eventBus;
 
-```java title="Productor (MfaResource.java)"
-@Inject EventBus eventBus;
-
-// Envía y espera respuesta (Request/Reply)
-Uni<MfaEventContext> result = eventBus.request("credentials.validate", ctx)
-    .map(reply -> (MfaEventContext) reply.body());
-```
-
-```java title="Consumer (MfaEventConsumers.java)"
-// Consumer no bloqueante — solo para lógica pura, sin I/O
-@ConsumeEvent("policy.evaluate")
-public MfaEventContext evaluatePolicy(MfaEventContext ctx) {
-    ctx.setMfaRequired(!ctx.getUsername().equals("admin"));
-    return ctx;
-}
-
-// Consumer bloqueante — necesario cuando hay I/O externo
-@ConsumeEvent(value = "credentials.validate", blocking = true)
-public MfaEventContext validateCredentials(MfaEventContext ctx) {
-    // Llama a Keycloak (I/O externo) — DEBE ser blocking
-    TokenResponseDto token = authPort.authenticate(ctx.getUsername(), ctx.getPassword());
-    ctx.setToken(token);
-    return ctx;
+public Uni<Response> recibirPedido(OrderRequest request) {
+    OrderContext context = new OrderContext(request);
+    
+    // Envía el evento inicial al intercomunicador de la cocina
+    return eventBus.<OrderContext>request("orden.tomada", context)
+        .onItem().transform(Message::body)
+        .map(ctx -> Response.ok(ctx).build());
 }
 ```
 
-:::caution Regla de Oro: blocking = true
-Si un consumer realiza **cualquier I/O** (llamada HTTP, lectura de BD, acceso a Redis), DEBE anotarse con `blocking = true`. Sin esto, el consumer bloqueará el **Netty Event Loop**, degradando el rendimiento de **todo el servidor**.
+### Los Consumidores (Listeners)
+
+Aquí es donde los "Cocineros" escuchan las órdenes suscritas. Es crucial respetar una regla de rendimiento de Quarkus.
+
+```java title="EstacionesConsumers.java"
+// 1. Consumer NO bloqueante: Tareas exclusivamente de memoria o cálculo en CPU
+@ConsumeEvent("bebida.servida")
+public OrderContext prepararBebidaFria(OrderContext ctx) {
+    // Es instantáneo, cálculo rápido, no requiere I/O externo
+    ctx.setDrinkType("COLD");
+    return ctx;
+}
+
+// 2. Consumer BLOQUEANTE: Tareas de entrada/salida (I/O, BD, API Externas, Disco)
+@ConsumeEvent(value = "orden.tomada", blocking = true)
+public OrderContext cocinarCarne(OrderContext ctx) {
+    // Simula ir al congelador o a una Base de Datos Externa (I/O).
+    inventarioDB.descontarCarne();
+    ctx.setFoodReady(true);
+    return ctx;
+}
+```
+
+:::danger Regla Crítica de Rendimiento
+Si un consumidor interactúa con la Base de Datos, llama a una red HTTP externa, o accede al FileSystem local, **DEBE declararse con `blocking = true`**. Si omites esto, Quarkus pensará que el hilo principal (Event Loop) se colgó por tu culpa y tu aplicación dejará de responder llamas nuevas.
 :::
-
----
-
-## 4. Desacoplamiento Semántico: El Verdadero Valor
-
-El beneficio más importante del EDA no es técnico; es conceptual. Al separar cada paso en un evento con nombre propio:
-
-1.  **El código refleja el negocio**: `credentials.validate`, `policy.evaluate`, `otp.generate` son frases que un Product Owner entiende sin saber Java.
-2.  **La extensión no rompe nada**: para agregar auditoría a cada paso, simplemente se suscribe otro consumer a la misma dirección.
-3.  **La trazabilidad es natural**: cada evento es un punto de registro independiente, reconstruible como línea de tiempo.
-
-> Primero se aprende a pensar en eventos dentro del mismo proceso. Después, si el sistema lo necesita, ese mismo pensamiento puede proyectarse a **Apache Kafka** o cualquier broker distribuido.
